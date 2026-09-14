@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Calendar card background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,30 h44 c3.3,0 6,2.7 6,6 v42 c0,3.3 -2.7,6 -6,6 h-44 c-3.3,0 -6,-2.7 -6,-6 v-42 c0,-3.3 2.7,-6 6,-6 z" />
+    
+    <!-- Calendar header bar -->
+    <path
+        android:fillColor="#4F46E5"
+        android:pathData="M26,36 c0,-3.3 2.7,-6 6,-6 h44 c3.3,0 6,2.7 6,6 v8 h-56 v-8 z" />
+    
+    <!-- Calendar rings/pins -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M38,24 h4 v8 h-4 z M66,24 h4 v8 h-4 z" />
+        
+    <!-- Timetable rows / grid lines -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M34,50 h18 v8 h-18 z M56,50 h18 v8 h-18 z M34,62 h28 v8 h-28 z M66,62 h8 v8 h-8 z M34,74 h14 v6 h-14 z" />
+    
+    <!-- Active course indicator badge -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M52,74 h22 v6 h-22 z" />
+</vector>
