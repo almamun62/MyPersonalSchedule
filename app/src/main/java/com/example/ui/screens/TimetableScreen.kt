@@ -401,14 +401,15 @@ fun TimetableScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 0.dp)
+                .padding(top = innerPadding.calculateTopPadding())
         ) {
             // Horizontal Weekday Strip (Screenshot 1: "9月" + "23 三", "24 四"...)
             WeekdayDateStrip(
                 month = currentMonth,
                 mondayDate = mondayThisWeek,
                 selectedDay = selectedDay,
-                onSelectDay = { viewModel.setSelectedDay(it) }
+                onSelectDay = { viewModel.setSelectedDay(it) },
+                courses = allCourses
             )
 
             HorizontalDivider(
@@ -652,8 +653,13 @@ fun WeekdayDateStrip(
     month: Int,
     mondayDate: LocalDate,
     selectedDay: Int,
-    onSelectDay: (Int) -> Unit
+    onSelectDay: (Int) -> Unit,
+    courses: List<com.example.domain.model.Course> = emptyList()
 ) {
+    val today = LocalDate.now()
+    val currentLang = LocalAppLanguage.current
+    val isEnglish = currentLang == "en" || !currentLang.startsWith("zh")
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         modifier = Modifier.fillMaxWidth()
@@ -661,43 +667,103 @@ fun WeekdayDateStrip(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            for (d in 1..7) {
-                val dayDate = mondayDate.plusDays((d - 1).toLong())
-                val dayNumber = dayDate.dayOfMonth
-                val isSelected = selectedDay == d
-                val currentLang = LocalAppLanguage.current
-                val isEnglish = currentLang == "en" || !currentLang.startsWith("zh")
-                val dayLabel = if (isEnglish) DAYS_ENGLISH[d - 1] else DAYS_CHINESE[d - 1].second
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 3.dp)
-                        .clickable { onSelectDay(d) }
+            // Month Badge on the left
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .width(44.dp)
+                    .height(52.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(4.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                    Text(
+                        text = if (isEnglish) java.time.Month.of(month).name.take(3).lowercase().replaceFirstChar { it.uppercase() } else "${month}月",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "📅",
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            // 7 Day Pills
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                for (d in 1..7) {
+                    val dayDate = mondayDate.plusDays((d - 1).toLong())
+                    val dayNumber = dayDate.dayOfMonth
+                    val isSelected = selectedDay == d
+                    val isToday = dayDate == today
+                    val dayLabel = if (isEnglish) DAYS_ENGLISH[d - 1] else DAYS_CHINESE[d - 1].second
+                    val hasCoursesOnDay = courses.any { it.dayOfWeek == d }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = when {
+                            isSelected -> MaterialTheme.colorScheme.primary
+                            isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        },
+                        shadowElevation = if (isSelected) 2.dp else 0.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 2.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSelectDay(d) }
                     ) {
-                        Text(
-                            text = dayLabel,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = dayNumber.toString(),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp)
+                        ) {
+                            Text(
+                                text = dayLabel,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when {
+                                    isSelected -> MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = dayNumber.toString(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                                            hasCoursesOnDay -> MaterialTheme.colorScheme.primary
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                            )
+                        }
                     }
                 }
             }
