@@ -50,6 +50,13 @@ fun FocusLockScreen(
     onEmergencyUnlock: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+    LaunchedEffect(Unit) {
+        com.example.util.HapticHelper.vibrateDevice(context, 120L)
+        com.example.util.HapticHelper.performClick(haptic)
+    }
+
     var remainingMillis by remember { mutableLongStateOf((endTimeMillis - System.currentTimeMillis()).coerceAtLeast(0L)) }
     var holdProgress by remember { mutableFloatStateOf(0f) }
     var isHoldingEmergency by remember { mutableStateOf(false) }

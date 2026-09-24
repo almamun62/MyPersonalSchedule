@@ -622,6 +622,9 @@ fun TaskItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -654,12 +657,20 @@ fun TaskItemCard(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clickable { onToggleComplete() },
+                    .clickable {
+                        com.example.util.HapticHelper.performClick(haptic)
+                        com.example.util.HapticHelper.vibrateDevice(context, 40L)
+                        onToggleComplete()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Checkbox(
                     checked = task.isCompleted,
-                    onCheckedChange = { onToggleComplete() },
+                    onCheckedChange = {
+                        com.example.util.HapticHelper.performClick(haptic)
+                        com.example.util.HapticHelper.vibrateDevice(context, 40L)
+                        onToggleComplete()
+                    },
                     modifier = Modifier.testTag("task_checkbox_${task.id}")
                 )
             }

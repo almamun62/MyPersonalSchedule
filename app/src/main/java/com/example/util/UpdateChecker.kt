@@ -30,10 +30,19 @@ object UpdateChecker {
                 val request = Request.Builder()
                     .url(url)
                     .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "CourseSchedule-Android-App")
                     .build()
 
                 client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@withContext null
+                    if (!response.isSuccessful) {
+                        // If 404 or no releases published yet, fallback gracefully to up-to-date
+                        return@withContext UpdateInfo(
+                            latestVersion = currentVersionName,
+                            releaseNotes = "You are up to date. (No remote releases found on GitHub repository yet).",
+                            downloadUrl = "https://github.com/$repoOwnerAndName/releases",
+                            isUpdateAvailable = false
+                        )
+                    }
                     val body = response.body?.string() ?: return@withContext null
                     val json = JSONObject(body)
                     val tagName = json.optString("tag_name", "1.0").removePrefix("v").removePrefix("V")
@@ -52,7 +61,13 @@ object UpdateChecker {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                null
+                // Fallback gracefully on network error/exception so it never fails awkwardly
+                UpdateInfo(
+                    latestVersion = currentVersionName,
+                    releaseNotes = "Unable to connect to GitHub releases. Please check your internet connection.",
+                    downloadUrl = "https://github.com/$repoOwnerAndName/releases",
+                    isUpdateAvailable = false
+                )
             }
         }
     }
