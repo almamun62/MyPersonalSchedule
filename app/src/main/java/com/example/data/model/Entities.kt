@@ -146,7 +146,7 @@ data class HolidayOverrideEntity(
 )
 
 enum class NoteType {
-    TEXT, DRAWING, IMAGE, VOICE
+    TEXT, DRAWING, IMAGE, VOICE, FILE
 }
 
 @Entity(tableName = "notes")

@@ -97,6 +97,7 @@ fun TimetableScreen(
     var showTimetableSettingsDialog by remember { mutableStateOf(false) }
     var showWidgetsDialog by remember { mutableStateOf(false) }
     var showSpreadsheetImportDialog by remember { mutableStateOf(false) }
+    var showGlobalSearch by remember { mutableStateOf(false) }
 
     // File picker launcher for Excel/CSV
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -195,6 +196,18 @@ fun TimetableScreen(
                     }
                 },
                 actions = {
+                    // Global Search Button
+                    IconButton(
+                        onClick = { showGlobalSearch = true },
+                        modifier = Modifier.testTag("global_search_button")
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = "Global Search",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
                     // 2. Add Course '+' (Screenshot 1)
                     IconButton(
                         onClick = {
@@ -475,6 +488,30 @@ fun TimetableScreen(
                 viewModel.updateCourse(it)
                 courseToEdit = null
                 Toast.makeText(context, "课程已更新", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showGlobalSearch) {
+        val state by viewModel.uiState.collectAsStateWithLifecycle()
+        val allDomainCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
+        com.example.ui.components.GlobalSearchDialog(
+            state = state,
+            viewModel = viewModel,
+            onDismiss = { showGlobalSearch = false },
+            onCourseClick = { entity ->
+                courseDetailToShow = allDomainCourses.find { it.id == entity.id } ?: com.example.domain.model.Course(
+                    id = entity.id,
+                    name = entity.name,
+                    code = entity.code,
+                    instructor = entity.instructor,
+                    classroom = entity.classroom,
+                    dayOfWeek = entity.dayOfWeek,
+                    startTime = entity.startTime,
+                    endTime = entity.endTime,
+                    colorHex = "#4F46E5",
+                    notes = entity.notes
+                )
             }
         )
     }
