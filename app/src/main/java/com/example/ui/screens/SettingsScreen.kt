@@ -63,7 +63,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     viewModel: ScheduleViewModel,
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: (() -> Unit)? = null,
+    onOpenThemeCustomization: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val allCourses by viewModel.allCourses.collectAsStateWithLifecycle()
@@ -177,6 +178,42 @@ fun SettingsScreen(
                             label = { Text("Night Mode".tr, fontSize = 12.sp) },
                             modifier = Modifier.weight(1f)
                         )
+                    }
+
+                    val currentAccent by viewModel.userPreferencesManager.accentColor.collectAsStateWithLifecycle()
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    Text(
+                        "Accent Color".tr,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        AppAccents.ALL.forEach { accent ->
+                            FilterChip(
+                                selected = currentAccent.id == accent.id,
+                                onClick = { viewModel.userPreferencesManager.setAccentColor(accent) },
+                                label = { Text(accent.tag, fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { onOpenThemeCustomization?.invoke() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_theme_customization_button")
+                    ) {
+                        Icon(AppIcons.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Theme Customization".tr)
                     }
                 }
             }

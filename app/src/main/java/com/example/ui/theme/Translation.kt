@@ -453,7 +453,16 @@ val UI_TRANSLATIONS = mapOf(
     "Release Notes:" to "更新日志：",
     "Download Update" to "下载更新",
     "Check Update Failed" to "检查更新失败，请检查网络后重试",
-    "Checking for updates..." to "正在检查更新..."
+    "Checking for updates..." to "正在检查更新...",
+    "Theme Customization" to "主题与个性化定制",
+    "Preset Accents" to "预设强调色",
+    "Custom Color Picker" to "自定义颜色拾取",
+    "Live Theme Preview" to "主题实时预览",
+    "Primary Button" to "主要按钮",
+    "Secondary Action" to "次要操作",
+    "Sample Badge" to "示例徽章",
+    "Selected" to "已选择",
+    "Apply Custom Color" to "应用自定义颜色"
 )
 
 val String.tr: String

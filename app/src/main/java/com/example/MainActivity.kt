@@ -62,6 +62,7 @@ import com.example.ui.screens.ImportScheduleScreen
 import com.example.ui.screens.MoreScreen
 import com.example.ui.screens.NotesScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.ThemeCustomizationScreen
 import com.example.ui.screens.TasksExamsScreen
 import com.example.ui.screens.TimetableScreen
 import com.example.ui.screens.UsageScreen
@@ -430,12 +431,28 @@ fun MainApp(
             composable("settings") {
                 SettingsScreen(
                     viewModel = scheduleViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenThemeCustomization = { navController.navigate("theme_customization") }
                 )
             }
 
             composable("SETTINGS") {
                 SettingsScreen(
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onOpenThemeCustomization = { navController.navigate("theme_customization") }
+                )
+            }
+
+            composable("theme_customization") {
+                ThemeCustomizationScreen(
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("THEME_CUSTOMIZATION") {
+                ThemeCustomizationScreen(
                     viewModel = scheduleViewModel,
                     onNavigateBack = { navController.popBackStack() }
                 )
