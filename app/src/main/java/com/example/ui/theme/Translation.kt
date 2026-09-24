@@ -446,6 +446,8 @@ val UI_TRANSLATIONS = mapOf(
     "• CSV & TSV: Column headers like Code, Name, Days, Start Time, End Time, Room, Instructor." to "• CSV & TSV：支持代码、名称、星期、开始时间、结束时间、教室、教师等列头。",
     "• Free Text / Portal Paste: Directly copy text from Chinese university portal or Tsinghua / SWPU." to "• 自由文本 / 教务网粘贴：直接复制中国大学教务网或清华/西南石油大学等格式。",
     "• Single / Double Weeks (单双周) & Make-up Days (调休) auto-recognized." to "• 自动识别单双周与调休安排。",
+    "Eye Care" to "护眼",
+    "Eye Care Mode" to "护眼模式",
     "Check for Updates" to "检查更新",
     "Current Version" to "当前版本",
     "You are on the latest version!" to "您当前使用的是最新版本！",
@@ -462,7 +464,25 @@ val UI_TRANSLATIONS = mapOf(
     "Secondary Action" to "次要操作",
     "Sample Badge" to "示例徽章",
     "Selected" to "已选择",
-    "Apply Custom Color" to "应用自定义颜色"
+    "Apply Custom Color" to "应用自定义颜色",
+    "Quick Note" to "快速备忘",
+    "Import Schedule" to "导入课表",
+    "Tasks & Exams" to "待办与考试",
+    "Notes" to "课程笔记",
+    "Screen Usage" to "屏幕使用统计",
+    "Academic Calendar" to "校历安排",
+    "Settings" to "系统设置",
+    "About App" to "关于应用",
+    "How to use" to "使用指南",
+    "More Options" to "更多选项",
+    "Whitelist Apps" to "白名单应用",
+    "Customize Alert Times (Global & Per-Course)" to "自定义提醒时间 (全局及单课)",
+    "Nightly Class Summary Reminder" to "每晚次日课程总结提醒",
+    "Nightly Summary Time" to "提醒时间",
+    "Live Status Notification" to "实时状态通知",
+    "Shows remaining duration of current class & name of next upcoming class in status bar." to "在状态栏中显示当前课程剩余时间及下一节课名称。",
+    "Show Live Status Notification" to "显示实时状态通知",
+    "Export to System Calendar (.ics)" to "导出至系统日历 (.ics)"
 )
 
 val String.tr: String

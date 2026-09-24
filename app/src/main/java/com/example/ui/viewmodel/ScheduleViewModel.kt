@@ -622,6 +622,46 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun postCurrentAndNextClassNotification(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val courses = repository.getCoursesBySemesterSync(uiState.value.activeSemester?.id ?: 1L)
+            val now = java.time.LocalTime.now()
+            val todayDayOfWeek = java.time.LocalDate.now().dayOfWeek.value
+
+            val todayCourses = courses.filter { it.dayOfWeek == todayDayOfWeek }.sortedBy { it.startTime }
+            
+            var currentCourse: CourseEntity? = null
+            var remainingMins = 0
+            var nextCourse: CourseEntity? = null
+
+            for (course in todayCourses) {
+                try {
+                    val start = java.time.LocalTime.parse(course.startTime)
+                    val end = java.time.LocalTime.parse(course.endTime)
+                    if (!now.isBefore(start) && !now.isAfter(end)) {
+                        currentCourse = course
+                        remainingMins = java.time.Duration.between(now, end).toMinutes().toInt()
+                    } else if (now.isBefore(start)) {
+                        if (nextCourse == null) {
+                            nextCourse = course
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            CourseNotificationManager.showCurrentAndNextClassNotification(
+                context = context,
+                currentClassName = currentCourse?.name,
+                remainingMinutes = remainingMins,
+                nextClassName = nextCourse?.name,
+                nextClassStartTime = nextCourse?.startTime,
+                nextClassroom = nextCourse?.classroom
+            )
+        }
+    }
+
     fun testNagNotification(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             val courses = repository.getCoursesBySemesterSync(uiState.value.activeSemester?.id ?: 1L)

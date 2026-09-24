@@ -20,6 +20,7 @@ object CourseNotificationManager {
 
     const val NOTIFICATION_ID_STICKY = 1001
     const val NOTIFICATION_ID_NAG = 1002
+    const val NOTIFICATION_ID_CURRENT_NEXT = 1003
     const val NOTIFICATION_BASE_REMINDER_15M = 20000
     const val NOTIFICATION_ID_WAKE_ALARM = 30001
     const val NOTIFICATION_ID_WIND_DOWN = 30002
@@ -260,6 +261,54 @@ object CourseNotificationManager {
             
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID_STICKY, notification)
+    }
+
+    /**
+     * Persistent notification showing current class remaining duration and next upcoming class.
+     */
+    fun showCurrentAndNextClassNotification(
+        context: Context,
+        currentClassName: String?,
+        remainingMinutes: Int,
+        nextClassName: String?,
+        nextClassStartTime: String?,
+        nextClassroom: String?
+    ) {
+        createNotificationChannels(context)
+
+        val openAppIntent = Intent(context, MainActivity::class.java)
+        val openAppPendingIntent = PendingIntent.getActivity(
+            context,
+            99,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (currentClassName != null) {
+            "Current: $currentClassName ($remainingMinutes mins left)"
+        } else {
+            "No ongoing class right now"
+        }
+
+        val text = if (nextClassName != null) {
+            "Next: $nextClassName at $nextClassStartTime (${nextClassroom ?: "Room TBD"})"
+        } else {
+            "No more upcoming classes today"
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ONGOING_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_agenda)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setOngoing(true)
+            .setContentIntent(openAppPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .build()
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID_CURRENT_NEXT, notification)
     }
 
     /**

@@ -195,27 +195,6 @@ fun TimetableScreen(
                     }
                 },
                 actions = {
-                    // 1. Blue Robot / AI Assistant Icon (Screenshot 1)
-                    IconButton(
-                        onClick = { onNavigateToChat?.invoke() ?: onNavigateToImport() },
-                        modifier = Modifier.testTag("timetable_ai_button")
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF4A90E2).copy(alpha = 0.15f),
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.AutoAwesome,
-                                    contentDescription = "AI Assistant",
-                                    tint = Color(0xFF337DFF),
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                        }
-                    }
-
                     // 2. Add Course '+' (Screenshot 1)
                     IconButton(
                         onClick = {
@@ -414,14 +393,15 @@ fun TimetableScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
-                )
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(top = 0.dp)
         ) {
             // Horizontal Weekday Strip (Screenshot 1: "9月" + "23 三", "24 四"...)
             WeekdayDateStrip(

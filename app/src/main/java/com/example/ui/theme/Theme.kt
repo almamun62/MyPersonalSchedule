@@ -39,6 +39,20 @@ private val LightColorScheme = lightColorScheme(
     outline = SurfaceBorderLight
 )
 
+private val EyeCareColorScheme = lightColorScheme(
+    primary = Color(0xFFB45309), // Warm amber
+    onPrimary = Color(0xFFFEF3C7),
+    primaryContainer = Color(0xFFFDE68A),
+    onPrimaryContainer = Color(0xFF78350F),
+    secondary = Color(0xFF92400E),
+    onSecondary = Color(0xFFFEF3C7),
+    background = Color(0xFFFBF7EE), // Warm cream paper background
+    surface = Color(0xFFF5EFE6), // Warm sepia card surface
+    onBackground = Color(0xFF43302B),
+    onSurface = Color(0xFF43302B),
+    outline = Color(0xFFD4C5B9)
+)
+
 @Composable
 fun CourseScheduleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -67,13 +81,15 @@ fun MyApplicationTheme(
     accentColor: AppAccentColor = AppAccents.BLUE,
     darkTheme: Boolean = when (themeMode) {
         AppThemeMode.DAY -> false
+        AppThemeMode.EYE_CARE -> false
         AppThemeMode.NIGHT -> true
         AppThemeMode.SYSTEM -> isSystemInDarkTheme()
     },
-    dynamicColor: Boolean = false,
+    dynamicColor: Boolean = true, // Enabled by default for OS-wise Material You dynamic wallpaper colors on Android 12+
     content: @Composable () -> Unit
 ) {
     val baseColorScheme = when {
+        themeMode == AppThemeMode.EYE_CARE -> EyeCareColorScheme
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
@@ -82,12 +98,16 @@ fun MyApplicationTheme(
         else -> LightColorScheme
     }
 
-    val colorScheme = baseColorScheme.copy(
-        primary = accentColor.primary,
-        onPrimary = accentColor.onPrimary,
-        primaryContainer = accentColor.primaryContainer,
-        onPrimaryContainer = accentColor.onPrimaryContainer
-    )
+    val colorScheme = if (themeMode == AppThemeMode.EYE_CARE || (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)) {
+        baseColorScheme
+    } else {
+        baseColorScheme.copy(
+            primary = accentColor.primary,
+            onPrimary = accentColor.onPrimary,
+            primaryContainer = accentColor.primaryContainer,
+            onPrimaryContainer = accentColor.onPrimaryContainer
+        )
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,
@@ -102,4 +122,3 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) = CourseScheduleTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, content = content)
-

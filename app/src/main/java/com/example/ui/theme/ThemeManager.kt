@@ -4,10 +4,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * Supported Theme display modes: Day Mode (Light), Night Mode (Dark OLED), or System.
+ * Supported Theme display modes: Day Mode (Light), Eye Care Mode (Warm Sepia), Night Mode (Dark OLED), or System.
  */
 enum class AppThemeMode(val title: String, val subtitle: String) {
     DAY("Day Mode", "Crisp high-contrast light theme"),
+    EYE_CARE("Eye Care Mode", "Warm sepia & amber tones to reduce eye strain"),
     NIGHT("Night Mode", "OLED deep black System dark theme"),
     SYSTEM("System Default", "Follows Android OS setting")
 }

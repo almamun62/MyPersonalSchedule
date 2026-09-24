@@ -58,9 +58,26 @@ class UserPreferencesManager(context: Context) {
     val isSleepAlarmSound: StateFlow<Boolean> = _isSleepAlarmSound.asStateFlow()
 
     private val _isBilingualPreferred = MutableStateFlow(prefs.getBoolean(KEY_BILINGUAL, true))
-    private val _appLanguage = MutableStateFlow(prefs.getString(KEY_APP_LANGUAGE, "en"))
+    private val defaultLang = if (java.util.Locale.getDefault().language.startsWith("zh")) "zh" else "en"
+    private val _appLanguage = MutableStateFlow(prefs.getString(KEY_APP_LANGUAGE, defaultLang))
     val appLanguage: StateFlow<String?> = _appLanguage.asStateFlow()
     val isBilingualPreferred: StateFlow<Boolean> = _isBilingualPreferred.asStateFlow()
+
+    private val _isNightlySummaryEnabled = MutableStateFlow(prefs.getBoolean(KEY_NIGHTLY_SUMMARY_ENABLED, true))
+    val isNightlySummaryEnabled: StateFlow<Boolean> = _isNightlySummaryEnabled.asStateFlow()
+
+    private val _nightlySummaryTime = MutableStateFlow(prefs.getString(KEY_NIGHTLY_SUMMARY_TIME, "21:00") ?: "21:00")
+    val nightlySummaryTime: StateFlow<String> = _nightlySummaryTime.asStateFlow()
+
+    fun setNightlySummaryEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NIGHTLY_SUMMARY_ENABLED, enabled).apply()
+        _isNightlySummaryEnabled.value = enabled
+    }
+
+    fun setNightlySummaryTime(time: String) {
+        prefs.edit().putString(KEY_NIGHTLY_SUMMARY_TIME, time).apply()
+        _nightlySummaryTime.value = time
+    }
 
     private val _geminiApiKey = MutableStateFlow(prefs.getString(KEY_GEMINI_API_KEY, ""))
     val geminiApiKey: StateFlow<String?> = _geminiApiKey.asStateFlow()
@@ -510,6 +527,8 @@ class UserPreferencesManager(context: Context) {
         private const val KEY_SESSION_COURSE_PRIORITIES = "pref_session_course_priorities"
         private const val KEY_TIME_BLOCK_PERMANENT_PREFERENCES = "pref_time_block_permanent_preferences"
         private const val KEY_HIDE_AUDITED_IN_CONFLICT = "pref_hide_audited_in_conflict"
+        private const val KEY_NIGHTLY_SUMMARY_ENABLED = "pref_nightly_summary_enabled"
+        private const val KEY_NIGHTLY_SUMMARY_TIME = "pref_nightly_summary_time"
 
         val defaultSectionTimings = listOf(
             com.example.data.model.SectionTiming(1, "08:00", "08:45"),

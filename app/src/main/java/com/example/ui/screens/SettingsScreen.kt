@@ -158,24 +158,30 @@ fun SettingsScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         FilterChip(
                             selected = currentThemeMode == AppThemeMode.SYSTEM,
                             onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.SYSTEM) },
-                            label = { Text("System".tr, fontSize = 12.sp) },
+                            label = { Text("System".tr, fontSize = 11.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = currentThemeMode == AppThemeMode.DAY,
                             onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.DAY) },
-                            label = { Text("Day Mode".tr, fontSize = 12.sp) },
+                            label = { Text("Day".tr, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = currentThemeMode == AppThemeMode.EYE_CARE,
+                            onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.EYE_CARE) },
+                            label = { Text("Eye Care".tr, fontSize = 11.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = currentThemeMode == AppThemeMode.NIGHT,
                             onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.NIGHT) },
-                            label = { Text("Night Mode".tr, fontSize = 12.sp) },
+                            label = { Text("Night".tr, fontSize = 11.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -274,6 +280,21 @@ fun SettingsScreen(
                             Text("Share".tr)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            com.example.util.CalendarExportHelper.exportWeeklyScheduleToIcs(context, allCourses.map { it.toEntity() })
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("export_ics_button")
+                    ) {
+                        Icon(AppIcons.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Export to System Calendar (.ics)".tr)
+                    }
                 }
             }
 
@@ -361,6 +382,38 @@ fun SettingsScreen(
                         Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(if (isCheckingUpdate) checkingText else checkUpdatesText)
+                    }
+                }
+            }
+
+            // Live Status Notification Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Live Status Notification".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        "Shows remaining duration of current class & name of next upcoming class in status bar.".tr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.postCurrentAndNextClassNotification(context)
+                            Toast.makeText(context, "Live notification posted!", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Show Live Status Notification".tr)
                     }
                 }
             }

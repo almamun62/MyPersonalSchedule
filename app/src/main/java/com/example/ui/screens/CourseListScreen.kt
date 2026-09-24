@@ -250,7 +250,17 @@ fun CourseRowItem(
                 }
             }
 
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                IconButton(
+                    onClick = {
+                        val entity = course.toEntity()
+                        com.example.util.CalendarExportHelper.exportCourseToCalendar(context, entity)
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(AppIcons.Share, contentDescription = "Add to Calendar", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }
                 IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
                     Icon(AppIcons.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
