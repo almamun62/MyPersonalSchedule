@@ -60,6 +60,7 @@ fun CourseListScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
     var courseToEdit by remember { mutableStateOf<Course?>(null) }
+    var notebookCourse by remember { mutableStateOf<com.example.data.model.CourseEntity?>(null) }
 
     val totalCredits = filteredCourses.distinctBy { it.code }.sumOf { it.credits }
     val uniqueClassesCount = filteredCourses.distinctBy { it.code }.size
@@ -134,6 +135,7 @@ fun CourseListScreen(
                     items(filteredCourses, key = { it.id }) { course ->
                         CourseRowItem(
                             course = course,
+                            onOpenNotebook = { notebookCourse = course.toEntity() },
                             onEdit = { courseToEdit = course },
                             onDelete = { viewModel.deleteCourse(course) }
                         )
@@ -165,11 +167,20 @@ fun CourseListScreen(
             }
         )
     }
+
+    notebookCourse?.let { courseEntity ->
+        com.example.ui.components.ClassNotebookDialog(
+            course = courseEntity,
+            viewModel = viewModel,
+            onDismiss = { notebookCourse = null }
+        )
+    }
 }
 
 @Composable
 fun CourseRowItem(
     course: Course,
+    onOpenNotebook: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -251,6 +262,12 @@ fun CourseRowItem(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onOpenNotebook,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(AppIcons.Edit, contentDescription = "Open Class Notebook", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                }
                 val context = androidx.compose.ui.platform.LocalContext.current
                 IconButton(
                     onClick = {

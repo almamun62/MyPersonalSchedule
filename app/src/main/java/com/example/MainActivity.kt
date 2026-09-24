@@ -51,7 +51,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.service.CourseNotificationManager
 import com.example.ui.components.BootstartOnboardingDialog
-import com.example.ui.components.QuickNoteDialog
 import com.example.ui.screens.AboutScreen
 import com.example.ui.screens.AcademicCalendarScreen
 import com.example.ui.screens.CourseListScreen
@@ -205,8 +204,6 @@ fun MainApp(
         }
     }
 
-    var showQuickNoteDialog by remember { mutableStateOf(false) }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -328,23 +325,19 @@ fun MainApp(
             composable(Screen.More.route) {
                 MoreScreen(
                     onNavigateTo = { destination ->
-                        if (destination == "QUICK_NOTE") {
-                            showQuickNoteDialog = true
-                        } else {
-                            val targetRoute = when (destination) {
-                                "IMPORT_SCHEDULE" -> "import_schedule"
-                                "TASKS_EXAMS" -> Screen.TasksExams.route
-                                "CHAT" -> "chat"
-                                "NOTES" -> "notes"
-                                "USAGE" -> "usage"
-                                "ACADEMIC_CALENDAR" -> "academic_calendar"
-                                "SETTINGS" -> "settings"
-                                "ABOUT" -> "about"
-                                "HOW_TO_USE" -> "how_to_use"
-                                else -> destination.lowercase()
-                            }
-                            navController.navigate(targetRoute)
+                        val targetRoute = when (destination) {
+                            "IMPORT_SCHEDULE" -> "import_schedule"
+                            "TASKS_EXAMS" -> Screen.TasksExams.route
+                            "CHAT" -> "chat"
+                            "NOTES" -> "notes"
+                            "USAGE" -> "usage"
+                            "ACADEMIC_CALENDAR" -> "academic_calendar"
+                            "SETTINGS" -> "settings"
+                            "ABOUT" -> "about"
+                            "HOW_TO_USE" -> "how_to_use"
+                            else -> destination.lowercase()
                         }
+                        navController.navigate(targetRoute)
                     }
                 )
             }
@@ -492,22 +485,6 @@ fun MainApp(
                 whitelistedPackages = uiState.focusWhitelistedPackages,
                 onEmergencyUnlock = {
                     scheduleViewModel.stopFocusLock(context)
-                }
-            )
-        }
-
-        if (showQuickNoteDialog) {
-            QuickNoteDialog(
-                onDismiss = { showQuickNoteDialog = false },
-                onSaveNote = { title, content ->
-                    scheduleViewModel.addNote(0L, "$title\n$content", "Quick Note")
-                },
-                onSaveTask = { title, priority ->
-                    scheduleViewModel.addTask(
-                        title = title,
-                        courseName = "General",
-                        priority = priority
-                    )
                 }
             )
         }

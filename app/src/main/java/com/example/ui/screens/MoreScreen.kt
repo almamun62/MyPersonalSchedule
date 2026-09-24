@@ -31,10 +31,9 @@ fun MoreScreen(
     modifier: Modifier = Modifier
 ) {
     val items = listOf(
-        MoreMenuItem("Quick Note".tr, Icons.Default.NoteAdd) { onNavigateTo("QUICK_NOTE") },
+        MoreMenuItem("Course Notes Archive".tr, Icons.Default.MenuBook) { onNavigateTo("NOTES") },
         MoreMenuItem("Import Schedule".tr, Icons.Default.CloudUpload) { onNavigateTo("IMPORT_SCHEDULE") },
         MoreMenuItem("Tasks & Exams".tr, Icons.Default.TaskAlt) { onNavigateTo("TASKS_EXAMS") },
-        MoreMenuItem("Notes".tr, Icons.Default.MenuBook) { onNavigateTo("NOTES") },
         MoreMenuItem("Screen Usage".tr, Icons.Default.Timeline) { onNavigateTo("USAGE") },
         MoreMenuItem("Academic Calendar".tr, Icons.Default.DateRange) { onNavigateTo("ACADEMIC_CALENDAR") },
         MoreMenuItem("Settings".tr, Icons.Default.Settings) { onNavigateTo("SETTINGS") },
