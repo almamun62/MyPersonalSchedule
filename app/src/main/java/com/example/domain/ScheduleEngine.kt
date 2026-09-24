@@ -54,7 +54,7 @@ object ScheduleEngine {
     /**
      * 2. Rule evaluation: ALL, ODD, EVEN, and CUSTOM (e.g., '1-8,10-16').
      */
-    fun isCourseActiveInWeek(rule: WeekRule, customWeeks: String, currentWeek: Int, totalWeeks: Int = 16): Boolean {
+    fun isCourseActiveInWeek(rule: WeekRule, customWeeks: String, currentWeek: Int, totalWeeks: Int = 20): Boolean {
         if (currentWeek < 1 || currentWeek > totalWeeks) return false
         return when (rule) {
             WeekRule.ALL -> true

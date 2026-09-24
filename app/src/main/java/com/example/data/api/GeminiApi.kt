@@ -9,9 +9,35 @@ import okhttp3.ResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Query
 import retrofit2.http.Streaming
+import retrofit2.http.Url
+
+// --- OpenAI Compatible Data Classes ---
+@Serializable
+data class OpenAIChatRequest(
+    val model: String,
+    val messages: List<OpenAIMessage>,
+    val temperature: Float? = null
+)
+
+@Serializable
+data class OpenAIMessage(
+    val role: String,
+    val content: String
+)
+
+@Serializable
+data class OpenAIChatResponse(
+    val choices: List<OpenAIChoice>? = null
+)
+
+@Serializable
+data class OpenAIChoice(
+    val message: OpenAIMessage
+)
 
 // --- Common Data Classes ---
 @Serializable
@@ -75,18 +101,34 @@ data class Candidate(
 
 // --- Retrofit Setup ---
 interface GeminiApiService {
-    @POST("v1beta/models/gemini-3.5-flash:generateContent")
+    @POST("v1beta/models/gemini-1.5-flash:generateContent")
     suspend fun generateContent(
         @Query("key") apiKey: String,
         @Body request: GenerateContentRequest
     ): GenerateContentResponse
+
+    @POST("v1beta/models/{model}:generateContent")
+    suspend fun generateContentWithModel(
+        @retrofit2.http.Path("model") model: String,
+        @Query("key") apiKey: String,
+        @Body request: GenerateContentRequest
+    ): GenerateContentResponse
     
-    @POST("v1beta/models/gemini-3.5-flash:streamGenerateContent")
+    @POST("v1beta/models/gemini-1.5-flash:streamGenerateContent")
     @Streaming
     suspend fun generateContentStream(
         @Query("key") apiKey: String,
         @Body request: GenerateContentRequest
     ): ResponseBody
+}
+
+interface OpenAIApiService {
+    @POST
+    suspend fun generateContent(
+        @Url url: String,
+        @Header("Authorization") authHeader: String,
+        @Body request: OpenAIChatRequest
+    ): OpenAIChatResponse
 }
 
 object RetrofitClient {
@@ -98,13 +140,23 @@ object RetrofitClient {
         .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
         .build()
 
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
+
     val service: GeminiApiService by lazy {
-        val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
         val retrofit = Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
         retrofit.create(GeminiApiService::class.java)
+    }
+
+    val openAiService: OpenAIApiService by lazy {
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL) // Base URL doesn't matter much as we pass @Url directly in the method
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+        retrofit.create(OpenAIApiService::class.java)
     }
 }

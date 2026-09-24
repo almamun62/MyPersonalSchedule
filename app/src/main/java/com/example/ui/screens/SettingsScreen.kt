@@ -1,13 +1,41 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -15,307 +43,382 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.HolidayOverrideEntity
-import com.example.data.model.HolidayOverrideType
-import com.example.ui.components.AddHolidayDialog
-import com.example.ui.viewmodel.ScheduleUiState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.theme.AppIcons
 import com.example.ui.viewmodel.ScheduleViewModel
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import com.example.ui.theme.AppThemeMode
+import com.example.ui.theme.AppAccents
+import com.example.ui.theme.tr
+import com.example.BuildConfig
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    state: ScheduleUiState,
     viewModel: ScheduleViewModel,
-    modifier: Modifier = Modifier
+    onNavigateBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    var showAddHolidayDialog by remember { mutableStateOf(false) }
-    var totalWeeksText by remember(state.activeSemester) {
-        mutableStateOf((state.activeSemester?.totalWeeks ?: 16).toString())
-    }
+    val allCourses by viewModel.allCourses.collectAsStateWithLifecycle()
+    val selectedSemester by viewModel.selectedSemester.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.userPreferencesManager.appLanguage.collectAsStateWithLifecycle()
+    val currentThemeMode by viewModel.userPreferencesManager.themeMode.collectAsStateWithLifecycle()
 
-    if (showAddHolidayDialog) {
-        AddHolidayDialog(
-            onDismiss = { showAddHolidayDialog = false },
-            onConfirm = { override ->
-                viewModel.addHolidayOverride(override)
-                showAddHolidayDialog = false
-            }
-        )
-    }
+    var showClearDialog by remember { mutableStateOf(false) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var updateInfo by remember { mutableStateOf<com.example.util.UpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 96.dp)
-    ) {
-        // 1. Zero Network & Privacy Guarantee
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Security,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "100% Offline-First Architecture",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "Zero network calls, analytics, or remote tracking. All course schedules, exams, and tasks reside strictly in your device's encrypted Room SQLite database.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                        )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings & Tools".tr, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    if (onNavigateBack != null) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back".tr)
+                        }
                     }
-                }
-            }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
         }
-
-        // 2. Semester Configuration Card
-        item {
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Language & Appearance Card
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Academic Semester Settings",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        "App Language & Appearance".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
 
-                    val semStartDate = state.activeSemester?.startDateMillis?.let {
-                        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().toString()
-                    } ?: "2026-09-01"
-
-                    Text("Term Name: ${state.activeSemester?.name ?: "Fall 2026 Term"}", style = MaterialTheme.typography.bodyMedium)
-                    Text("Semester Start Date: $semStartDate", style = MaterialTheme.typography.bodyMedium)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = totalWeeksText,
-                            onValueChange = { totalWeeksText = it },
-                            label = { Text("Total Weeks in Term") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(
-                            onClick = {
-                                val weeks = totalWeeksText.toIntOrNull() ?: 16
-                                state.activeSemester?.let { sem ->
-                                    viewModel.updateSemester(sem.startDateMillis, weeks)
-                                }
-                            }
-                        ) {
-                            Text("Save")
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. Automation & DND Settings
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
                     Text(
-                        text = "Do Not Disturb & Automation Engine",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        "App Language".tr,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Notification Policy Access", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                text = if (state.isDndPermissionGranted) "Granted • Able to control DND filter" else "Not granted • Tap to open system settings",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (state.isDndPermissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        if (!state.isDndPermissionGranted) {
-                            Button(onClick = { viewModel.requestDndPermission(context) }) {
-                                Text("Grant")
-                            }
-                        } else {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Auto-DND on Class Start", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "Automatically silences distractions and keeps DND active through consecutive lectures",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = state.isAutoDndEnabled,
-                            onCheckedChange = { viewModel.toggleAutoDnd(it) }
-                        )
-                    }
-
-                    HorizontalDivider()
-
-                    Text("Manual Diagnostic & Test Actions", style = MaterialTheme.typography.labelMedium)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = { viewModel.testStickyNotification(context) },
+                        FilterChip(
+                            selected = currentLanguage == "system" || currentLanguage == null,
+                            onClick = { viewModel.userPreferencesManager.setAppLanguage("system") },
+                            label = { Text("Follow System".tr, fontSize = 12.sp) },
+                            modifier = Modifier.weight(1.2f)
+                        )
+                        FilterChip(
+                            selected = currentLanguage == "en",
+                            onClick = { viewModel.userPreferencesManager.setAppLanguage("en") },
+                            label = { Text("English", fontSize = 12.sp) },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Test Sticky Alert", fontSize = 11.sp)
-                        }
-                        OutlinedButton(
-                            onClick = { viewModel.testNagNotification(context) },
+                        )
+                        FilterChip(
+                            selected = currentLanguage == "zh",
+                            onClick = { viewModel.userPreferencesManager.setAppLanguage("zh") },
+                            label = { Text("中文", fontSize = 12.sp) },
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Test Nag Loop", fontSize = 11.sp)
-                        }
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    Text(
+                        "Theme Mode".tr,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = currentThemeMode == AppThemeMode.SYSTEM,
+                            onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.SYSTEM) },
+                            label = { Text("System".tr, fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = currentThemeMode == AppThemeMode.DAY,
+                            onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.DAY) },
+                            label = { Text("Day Mode".tr, fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = currentThemeMode == AppThemeMode.NIGHT,
+                            onClick = { viewModel.userPreferencesManager.setThemeMode(AppThemeMode.NIGHT) },
+                            label = { Text("Night Mode".tr, fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
-        }
 
-        // 4. Chinese Holiday & Weekend Make-up Day (调休) Overrides
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Export Section
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(
-                        text = "Holiday & Make-up Engine (调休)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        "Export Timetable".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Text(
-                        text = "Auto-pauses on holidays or substitutes weekend schedules",
+                        "${"Courses".tr}: ${allCourses.size}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
 
-                FilledTonalButton(
-                    onClick = { showAddHolidayDialog = true },
-                    modifier = Modifier.testTag("add_holiday_override_button")
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Override")
-                }
-            }
-        }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val csvCopiedMsg = "CSV copied to clipboard!".tr
+                        val shareCsvTitle = "Share Schedule CSV".tr
+                        Button(
+                            onClick = {
+                                val csv = viewModel.exportToCsv()
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("Course Schedule CSV", csv)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, csvCopiedMsg, Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("copy_csv_button")
+                        ) {
+                            Icon(AppIcons.Copy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Copy CSV".tr)
+                        }
 
-        if (state.holidayOverrides.isEmpty()) {
-            item {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(16.dp)) {
-                        Text("No holiday overrides set. Tap + to add holidays or weekend make-up days.")
+                        OutlinedButton(
+                            onClick = {
+                                val csv = viewModel.exportToCsv()
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, csv)
+                                    type = "text/plain"
+                                }
+                                val shareIntent = Intent.createChooser(sendIntent, shareCsvTitle)
+                                context.startActivity(shareIntent)
+                            },
+                            modifier = Modifier.testTag("share_csv_button")
+                        ) {
+                            Icon(AppIcons.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Share".tr)
+                        }
                     }
                 }
             }
-        } else {
-            items(state.holidayOverrides, key = { it.id }) { override ->
-                HolidayOverrideRow(
-                    override = override,
-                    onDelete = { viewModel.deleteHolidayOverride(override) }
-                )
+
+            // Import Formats Guide
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(AppIcons.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Supported Import Formats".tr,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
+                    Text(
+                        "• CSV & TSV: Column headers like Code, Name, Days, Start Time, End Time, Room, Instructor.".tr,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "• Free Text / Portal Paste: Directly copy text from Chinese university portal or Tsinghua / SWPU.".tr,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "• Single / Double Weeks (单双周) & Make-up Days (调休) auto-recognized.".tr,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            // Check for Updates Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Check for Updates".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    val currentVersionText = "Current Version".tr
+                    val checkingText = "Checking for updates...".tr
+                    val checkUpdatesText = "Check for Updates".tr
+                    val upToDateMsg = "You are on the latest version!".tr
+                    val failedMsg = "Check Update Failed".tr
+
+                    Text(
+                        "$currentVersionText: ${BuildConfig.VERSION_NAME} (v${BuildConfig.VERSION_CODE})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                isCheckingUpdate = true
+                                val info = com.example.util.UpdateChecker.checkForUpdates(context, BuildConfig.VERSION_NAME)
+                                isCheckingUpdate = false
+                                if (info != null) {
+                                    updateInfo = info
+                                    if (info.isUpdateAvailable) {
+                                        showUpdateDialog = true
+                                    } else {
+                                        Toast.makeText(context, upToDateMsg, Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isCheckingUpdate,
+                        modifier = Modifier.testTag("check_update_button")
+                    ) {
+                        Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isCheckingUpdate) checkingText else checkUpdatesText)
+                    }
+                }
+            }
+
+            // Danger Zone
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Data Management".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    )
+                    Text(
+                        "Reset timetable database or clear all schedule entries.".tr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { showClearDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.testTag("clear_all_data_button")
+                    ) {
+                        Icon(AppIcons.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Clear All Schedule Data".tr)
+                    }
+                }
             }
         }
     }
-}
 
-@Composable
-private fun HolidayOverrideRow(
-    override: HolidayOverrideEntity,
-    onDelete: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (override.type == HolidayOverrideType.HOLIDAY) {
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text("Clear All Data?".tr) },
+            text = { Text("Are you sure you want to delete all courses and timetable schedules? This action cannot be undone.".tr) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearAllData()
+                        showClearDialog = false
+                        Toast.makeText(context, "All data cleared", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear Everything".tr)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showClearDialog = false }) {
+                    Text("Cancel".tr)
+                }
             }
         )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Icon(
-                imageVector = if (override.type == HolidayOverrideType.HOLIDAY) Icons.Default.BeachAccess else Icons.Default.SwapHoriz,
-                contentDescription = null,
-                tint = if (override.type == HolidayOverrideType.HOLIDAY) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary
-            )
+    }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = override.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "Date: ${override.dateString} • ${if (override.type == HolidayOverrideType.HOLIDAY) "Classes Paused" else "Make-up Day (Follows day ${override.targetDayOfWeek})"} ",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    if (showUpdateDialog && updateInfo != null) {
+        val info = updateInfo!!
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text("Update Available".tr) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("A new version v${info.latestVersion} is available on GitHub.")
+                    Text("Release Notes:".tr, fontWeight = FontWeight.Bold)
+                    Text(info.releaseNotes, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        com.example.util.UpdateChecker.openDownloadPage(context, info.downloadUrl)
+                        showUpdateDialog = false
+                    }
+                ) {
+                    Text("Download Update".tr)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showUpdateDialog = false }) {
+                    Text("Cancel".tr)
+                }
             }
-
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
-            }
-        }
+        )
     }
 }

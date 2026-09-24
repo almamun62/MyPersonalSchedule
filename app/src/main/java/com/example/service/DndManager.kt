@@ -13,8 +13,12 @@ object DndManager {
      * Checks if notification policy access (Do Not Disturb access) is granted.
      */
     fun checkDndPermission(context: Context): Boolean {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        return notificationManager?.isNotificationPolicyAccessGranted == true
+        return try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            notificationManager?.isNotificationPolicyAccessGranted == true
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
@@ -47,7 +51,11 @@ object DndManager {
             } else {
                 NotificationManager.INTERRUPTION_FILTER_ALL
             }
+            try {
             notificationManager.setInterruptionFilter(filter)
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        }
             Log.i(TAG, "DND interruption filter set to: $filter")
             true
         } catch (e: Exception) {
@@ -60,10 +68,14 @@ object DndManager {
      * Returns true if DND is currently active (priority, none, or alarms only).
      */
     fun isDndActive(context: Context): Boolean {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            ?: return false
-        val current = notificationManager.currentInterruptionFilter
-        return current != NotificationManager.INTERRUPTION_FILTER_ALL &&
-                current != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        return try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                ?: return false
+            val current = notificationManager.currentInterruptionFilter
+            current != NotificationManager.INTERRUPTION_FILTER_ALL &&
+                    current != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+        } catch (e: Exception) {
+            false
+        }
     }
 }

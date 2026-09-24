@@ -1,251 +1,121 @@
 package com.example
 
 import android.Manifest
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.service.CourseNotificationManager
-import com.example.ui.screens.*
+import com.example.ui.components.BootstartOnboardingDialog
+import com.example.ui.components.QuickNoteDialog
+import com.example.ui.screens.AboutScreen
+import com.example.ui.screens.AcademicCalendarScreen
+import com.example.ui.screens.CourseListScreen
+import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.FocusLockScreen
+import com.example.ui.screens.HowToUseScreen
+import com.example.ui.screens.ImportScheduleScreen
+import com.example.ui.screens.MoreScreen
+import com.example.ui.screens.NotesScreen
+import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.TasksExamsScreen
+import com.example.ui.screens.TimetableScreen
+import com.example.ui.screens.UsageScreen
+import com.example.ui.theme.LocalAppLanguage
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.tr
+import com.example.ui.viewmodel.ImportViewModel
 import com.example.ui.viewmodel.ScheduleViewModel
 
+sealed class Screen(val route: String, val titleKey: String, val icon: ImageVector) {
+    object Dashboard : Screen("dashboard", "Dashboard", Icons.Default.Dashboard)
+    object Timetable : Screen("timetable", "Timetable", Icons.Default.CalendarMonth)
+    object TasksExams : Screen("tasks_exams", "Tasks", Icons.Default.TaskAlt)
+    object Courses : Screen("courses", "Courses", Icons.Default.School)
+    object More : Screen("more", "More", Icons.Default.GridView)
+}
+
 class MainActivity : ComponentActivity() {
-    private val viewModel: ScheduleViewModel by viewModels()
+
+    private val scheduleViewModel: ScheduleViewModel by viewModels()
+    private val importViewModel: ImportViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Handle possible post-class prompt intent
-        handleIntent(intent)
+        try {
+            CourseNotificationManager.createNotificationChannels(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         setContent {
-            MyApplicationTheme {
-                // Runtime permission request for notifications (Android 13+)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val notifPermissionLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.RequestPermission(),
-                        onResult = { /* Handled */ }
-                    )
-                    LaunchedEffect(Unit) {
-                        notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
+            val themeMode by scheduleViewModel.userPreferencesManager.themeMode.collectAsStateWithLifecycle()
+            val accentColor by scheduleViewModel.userPreferencesManager.accentColor.collectAsStateWithLifecycle()
+            val appLanguage by scheduleViewModel.userPreferencesManager.appLanguage.collectAsStateWithLifecycle()
 
-                MyScheduleApp(viewModel = viewModel)
+            val effectiveLanguage = when (appLanguage) {
+                "system", null -> java.util.Locale.getDefault().language
+                "zh" -> "zh"
+                "en" -> "en"
+                else -> appLanguage ?: java.util.Locale.getDefault().language
             }
-        }
-    }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleIntent(intent)
-    }
-
-    private fun handleIntent(intent: Intent?) {
-        if (intent?.action == CourseNotificationManager.ACTION_POST_CLASS_PROMPT) {
-            val course = intent.getStringExtra("COURSE_NAME")
-            viewModel.setQuickTaskCourse(course)
-        }
-    }
-}
-
-enum class ScheduleScreen(val title: String) {
-    DASHBOARD("Dashboard"),
-    TIMETABLE("Timetable"),
-    TASKS_EXAMS("Tasks & Exams"),
-    CHAT("AI Chat"),
-    SETTINGS("Settings")
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MyScheduleApp(viewModel: ScheduleViewModel) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val screens = ScheduleScreen.values()
-    val pagerState = rememberPagerState(pageCount = { screens.size })
-    val coroutineScope = rememberCoroutineScope()
-    val currentScreen = screens[pagerState.currentPage]
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "MySchedule",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    // DND status pill
-                    if (state.isDndActive) {
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            modifier = Modifier.padding(end = 12.dp)
-                        ) {
-                            Text(
-                                text = "DND Active",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    } else {
-                        Surface(
-                            shape = MaterialTheme.shapes.small,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.padding(end = 12.dp)
-                        ) {
-                            Text(
-                                text = "Week ${state.currentAcademicWeek}",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp
+            CompositionLocalProvider(
+                LocalAppLanguage provides effectiveLanguage
             ) {
-                NavigationBarItem(
-                    selected = currentScreen == ScheduleScreen.DASHBOARD,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.DASHBOARD.ordinal) } },
-                    icon = {
-                        Icon(
-                            if (currentScreen == ScheduleScreen.DASHBOARD) Icons.Default.Dashboard else Icons.Outlined.Dashboard,
-                            contentDescription = "Dashboard"
-                        )
-                    },
-                    label = { Text("Dashboard") },
-                    modifier = Modifier.testTag("nav_dashboard")
-                )
-                NavigationBarItem(
-                    selected = currentScreen == ScheduleScreen.TIMETABLE,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.TIMETABLE.ordinal) } },
-                    icon = {
-                        Icon(
-                            if (currentScreen == ScheduleScreen.TIMETABLE) Icons.Default.CalendarMonth else Icons.Outlined.CalendarMonth,
-                            contentDescription = "Timetable"
-                        )
-                    },
-                    label = { Text("Timetable") },
-                    modifier = Modifier.testTag("nav_timetable")
-                )
-                NavigationBarItem(
-                    selected = currentScreen == ScheduleScreen.TASKS_EXAMS,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.TASKS_EXAMS.ordinal) } },
-                    icon = {
-                        BadgedBox(
-                            badge = {
-                                if (state.pendingTasks.isNotEmpty()) {
-                                    Badge { Text("${state.pendingTasks.size}") }
-                                }
-                            }
-                        ) {
-                            Icon(
-                                if (currentScreen == ScheduleScreen.TASKS_EXAMS) Icons.Default.TaskAlt else Icons.Outlined.TaskAlt,
-                                contentDescription = "Tasks"
-                            )
-                        }
-                    },
-                    label = { Text("Tasks") },
-                    modifier = Modifier.testTag("nav_tasks")
-                )
-                NavigationBarItem(
-                    selected = currentScreen == ScheduleScreen.CHAT,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.CHAT.ordinal) } },
-                    icon = {
-                        Icon(
-                            if (currentScreen == ScheduleScreen.CHAT) Icons.Default.Chat else Icons.Outlined.Chat,
-                            contentDescription = "Chat"
-                        )
-                    },
-                    label = { Text("Chat") },
-                    modifier = Modifier.testTag("nav_chat")
-                )
-                NavigationBarItem(
-                    selected = currentScreen == ScheduleScreen.SETTINGS,
-                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.SETTINGS.ordinal) } },
-                    icon = {
-                        Icon(
-                            if (currentScreen == ScheduleScreen.SETTINGS) Icons.Default.Tune else Icons.Outlined.Tune,
-                            contentDescription = "Settings"
-                        )
-                    },
-                    label = { Text("Settings") },
-                    modifier = Modifier.testTag("nav_settings")
-                )
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-                .imePadding()
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = true
-            ) { page ->
-                when (screens[page]) {
-                    ScheduleScreen.DASHBOARD -> DashboardScreen(
-                        state = state,
-                        viewModel = viewModel,
-                        onNavigateToTimetable = { coroutineScope.launch { pagerState.animateScrollToPage(ScheduleScreen.TIMETABLE.ordinal) } }
-                    )
-                    ScheduleScreen.TIMETABLE -> TimetableScreen(
-                        state = state,
-                        viewModel = viewModel
-                    )
-                    ScheduleScreen.TASKS_EXAMS -> TasksExamsScreen(
-                        state = state,
-                        viewModel = viewModel
-                    )
-                    ScheduleScreen.CHAT -> ChatScreen()
-                    ScheduleScreen.SETTINGS -> SettingsScreen(
-                        state = state,
-                        viewModel = viewModel
+                MyApplicationTheme(
+                    themeMode = themeMode,
+                    accentColor = accentColor
+                ) {
+                    MainApp(
+                        scheduleViewModel = scheduleViewModel,
+                        importViewModel = importViewModel
                     )
                 }
             }
@@ -254,12 +124,375 @@ fun MyScheduleApp(viewModel: ScheduleViewModel) {
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(text = "Hello $name!", modifier = modifier)
-}
+fun MainApp(
+    scheduleViewModel: ScheduleViewModel,
+    importViewModel: ImportViewModel
+) {
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route ?: Screen.Timetable.route
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MyApplicationTheme { Greeting("Android") }
+    val uiState by scheduleViewModel.uiState.collectAsStateWithLifecycle()
+    val hasCompletedOnboarding by scheduleViewModel.userPreferencesManager.hasCompletedOnboarding.collectAsStateWithLifecycle()
+    val appLanguage by scheduleViewModel.userPreferencesManager.appLanguage.collectAsStateWithLifecycle()
+    val themeMode by scheduleViewModel.userPreferencesManager.themeMode.collectAsStateWithLifecycle()
+    val accentColor by scheduleViewModel.userPreferencesManager.accentColor.collectAsStateWithLifecycle()
+
+    var showOnboarding by remember { mutableStateOf(!hasCompletedOnboarding) }
+
+    if (showOnboarding && !hasCompletedOnboarding) {
+        BootstartOnboardingDialog(
+            initialAppLanguage = appLanguage ?: "en",
+            initialThemeMode = themeMode,
+            initialAccent = accentColor,
+            initialAutoDnd = scheduleViewModel.userPreferencesManager.isAutoDndEnabled.value,
+            initial15mReminder = scheduleViewModel.userPreferencesManager.isClassReminder15mEnabled.value,
+            onComplete = { lang, mode, accent, dnd, reminder, option, bilingual ->
+                scheduleViewModel.userPreferencesManager.setAppLanguage(lang)
+                scheduleViewModel.userPreferencesManager.setThemeMode(mode)
+                scheduleViewModel.userPreferencesManager.setAccentColor(accent)
+                scheduleViewModel.userPreferencesManager.setAutoDndEnabled(dnd)
+                scheduleViewModel.userPreferencesManager.setClassReminder15mEnabled(reminder)
+                scheduleViewModel.userPreferencesManager.setBilingualPreferred(bilingual)
+                scheduleViewModel.userPreferencesManager.setOnboardingCompleted(true)
+                showOnboarding = false
+                if (option == 0) {
+                    // Option 0: Load Mamun Fall 2026 Schedule directly into Room database
+                    scheduleViewModel.loadPresetMamunSchedule(bilingual = bilingual, replaceExisting = true)
+                } else if (option == 1) {
+                    navController.navigate("import_schedule")
+                }
+            },
+            onDismiss = {
+                scheduleViewModel.userPreferencesManager.setOnboardingCompleted(true)
+                showOnboarding = false
+            }
+        )
+    }
+
+    val navItems = listOf(
+        Screen.Timetable,
+        Screen.Dashboard,
+        Screen.TasksExams,
+        Screen.Courses,
+        Screen.More
+    )
+
+    val bottomBarRoutes = setOf(
+        Screen.Timetable.route,
+        Screen.Dashboard.route,
+        Screen.TasksExams.route,
+        Screen.Courses.route,
+        Screen.More.route
+    )
+
+    val showBottomBar = currentRoute in bottomBarRoutes
+
+    val isFocusLocked = uiState.focusLockEndTimeMillis > System.currentTimeMillis()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? android.app.Activity
+
+    LaunchedEffect(isFocusLocked) {
+        try {
+            if (isFocusLocked) {
+                activity?.startLockTask()
+            } else {
+                activity?.stopLockTask()
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "LockTask mode error", e)
+        }
+    }
+
+    var showQuickNoteDialog by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            bottomBar = {
+                if (showBottomBar) {
+                    NavigationBar(
+                        modifier = Modifier.testTag("main_bottom_nav"),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 3.dp
+                    ) {
+                        navItems.forEach { screen ->
+                            val isSelected = currentRoute == screen.route
+                            val labelText = screen.titleKey.tr
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = {
+                                    if (currentRoute != screen.route) {
+                                        navController.navigate(screen.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = screen.icon,
+                                        contentDescription = labelText,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = labelText,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontSize = 11.sp,
+                                        lineHeight = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                    )
+                                },
+                                alwaysShowLabel = true,
+                                colors = NavigationBarItemDefaults.colors(
+                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                modifier = Modifier.testTag("nav_item_${screen.route}")
+                            )
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Timetable.route,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+            composable(Screen.Dashboard.route) {
+                DashboardScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel,
+                    onNavigateToTimetable = {
+                        navController.navigate(Screen.Timetable.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Timetable.route) {
+                TimetableScreen(
+                    viewModel = scheduleViewModel,
+                    onNavigateToImport = {
+                        navController.navigate("import_schedule")
+                    },
+                    onNavigateToChat = {
+                        navController.navigate("chat")
+                    },
+                    onNavigateToCourses = {
+                        navController.navigate(Screen.Courses.route)
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate("about")
+                    }
+                )
+            }
+
+            composable(Screen.TasksExams.route) {
+                TasksExamsScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel
+                )
+            }
+
+            composable("TASKS_EXAMS") {
+                TasksExamsScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel
+                )
+            }
+
+            composable(Screen.Courses.route) {
+                CourseListScreen(viewModel = scheduleViewModel)
+            }
+
+            composable(Screen.More.route) {
+                MoreScreen(
+                    onNavigateTo = { destination ->
+                        if (destination == "QUICK_NOTE") {
+                            showQuickNoteDialog = true
+                        } else {
+                            val targetRoute = when (destination) {
+                                "IMPORT_SCHEDULE" -> "import_schedule"
+                                "TASKS_EXAMS" -> Screen.TasksExams.route
+                                "CHAT" -> "chat"
+                                "NOTES" -> "notes"
+                                "USAGE" -> "usage"
+                                "ACADEMIC_CALENDAR" -> "academic_calendar"
+                                "SETTINGS" -> "settings"
+                                "ABOUT" -> "about"
+                                "HOW_TO_USE" -> "how_to_use"
+                                else -> destination.lowercase()
+                            }
+                            navController.navigate(targetRoute)
+                        }
+                    }
+                )
+            }
+
+            // Sub-destinations reachable from MoreScreen or shortcuts
+            composable("import_schedule") {
+                ImportScheduleScreen(
+                    importViewModel = importViewModel,
+                    scheduleViewModel = scheduleViewModel,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToTimetable = {
+                        navController.navigate(Screen.Timetable.route) {
+                            popUpTo(Screen.Dashboard.route)
+                        }
+                    }
+                )
+            }
+
+            composable("IMPORT_SCHEDULE") {
+                ImportScheduleScreen(
+                    importViewModel = importViewModel,
+                    scheduleViewModel = scheduleViewModel,
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToTimetable = {
+                        navController.navigate(Screen.Timetable.route) {
+                            popUpTo(Screen.Dashboard.route)
+                        }
+                    }
+                )
+            }
+
+
+
+            composable("notes") {
+                NotesScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("NOTES") {
+                NotesScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("usage") {
+                UsageScreen(
+                    state = uiState,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("USAGE") {
+                UsageScreen(
+                    state = uiState,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("academic_calendar") {
+                AcademicCalendarScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("ACADEMIC_CALENDAR") {
+                AcademicCalendarScreen(
+                    state = uiState,
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("settings") {
+                SettingsScreen(
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("SETTINGS") {
+                SettingsScreen(
+                    viewModel = scheduleViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("about") {
+                AboutScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("ABOUT") {
+                AboutScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("how_to_use") {
+                HowToUseScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable("HOW_TO_USE") {
+                HowToUseScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+        }
+    }
+
+        if (isFocusLocked) {
+            FocusLockScreen(
+                endTimeMillis = uiState.focusLockEndTimeMillis,
+                totalDurationSeconds = uiState.focusLockDurationSeconds,
+                courseName = uiState.focusLockCourseName,
+                whitelistedPackages = uiState.focusWhitelistedPackages,
+                onEmergencyUnlock = {
+                    scheduleViewModel.stopFocusLock(context)
+                }
+            )
+        }
+
+        if (showQuickNoteDialog) {
+            QuickNoteDialog(
+                onDismiss = { showQuickNoteDialog = false },
+                onSaveNote = { title, content ->
+                    scheduleViewModel.addNote(0L, "$title\n$content", "Quick Note")
+                },
+                onSaveTask = { title, priority ->
+                    scheduleViewModel.addTask(
+                        title = title,
+                        courseName = "General",
+                        priority = priority
+                    )
+                }
+            )
+        }
+    }
 }

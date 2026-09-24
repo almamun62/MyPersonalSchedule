@@ -34,7 +34,7 @@ class ChatViewModel : ViewModel() {
         parts = listOf(Part(text = "You are an AI assistant built into 'MySchedule', a completely offline-first, private personal course assistant for university students. Be helpful, concise, and friendly."))
     )
 
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, apiKey: String, appContextData: String = "", baseUrl: String = "https://generativelanguage.googleapis.com/v1beta/openai/", modelName: String = "gemini-1.5-flash") {
         if (text.isBlank()) return
 
         val userMessage = ChatMessage(
@@ -53,32 +53,31 @@ class ChatViewModel : ViewModel() {
 
         _messages.value = _messages.value + listOf(userMessage, typingMessage)
 
+        if (apiKey.isBlank()) {
+            updateMessageText(typingId, "Please add your AI API Key in Settings.", isGenerating = false, isError = true)
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // Build history
+                val provider = com.example.domain.ai.AiServiceProviderFactory.getProvider(baseUrl)
+                val systemInstruction = "You are an AI assistant built into 'MySchedule', a completely offline-first, private personal course assistant for university students. Be helpful, concise, and friendly. Here is the current context of the user's schedule and tasks:\n$appContextData"
+                
                 val history = _messages.value
                     .filter { !it.isGenerating && !it.isError }
-                    .takeLast(10) // Send last 10 messages for context
-                    .map { msg ->
-                        Content(
-                            role = if (msg.isUser) "user" else "model",
-                            parts = listOf(Part(text = msg.text))
-                        )
-                    }
-
-                val request = GenerateContentRequest(
-                    contents = history,
-                    systemInstruction = systemInstruction
+                    .takeLast(10)
+                    
+                val responseText = provider.generateResponse(
+                    apiKey = apiKey,
+                    baseUrl = baseUrl,
+                    modelName = modelName,
+                    systemInstruction = systemInstruction,
+                    history = history
                 )
-
-                val response = RetrofitClient.service.generateContent(BuildConfig.GEMINI_API_KEY, request)
-                val responseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text ?: "I'm sorry, I couldn't generate a response."
-
-                // Update the typing message with the actual response
+                
                 updateMessageText(typingId, responseText, isGenerating = false)
-
             } catch (e: Exception) {
-                updateMessageText(typingId, "Error connecting to Gemini API: ${e.localizedMessage}", isGenerating = false, isError = true)
+                updateMessageText(typingId, "API Error: ${e.localizedMessage}", isGenerating = false, isError = true)
             }
         }
     }

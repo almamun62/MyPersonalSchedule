@@ -2,38 +2,37 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Blue (HyperOS Vivid)
-val HyperBluePrimary = Color(0xFF337DFF)
-val HyperBlueOnPrimary = Color(0xFFFFFFFF)
-val HyperBluePrimaryContainer = Color(0xFFD6E4FF)
-val HyperBlueOnPrimaryContainer = Color(0xFF002366)
+val PrimaryBlue = Color(0xFF1E3A8A)
+val PrimaryBlueDark = Color(0xFF172554)
+val AccentCyan = Color(0xFF0284C7)
+val AccentAmber = Color(0xFFD97706)
+val AccentEmerald = Color(0xFF059669)
+val AccentRose = Color(0xFFE11D48)
 
-// Secondary Cyan
-val HyperCyanSecondary = Color(0xFF00B4D8)
-val HyperCyanOnSecondary = Color(0xFFFFFFFF)
-val HyperCyanSecondaryContainer = Color(0xFFCCF0F8)
-val HyperCyanOnSecondaryContainer = Color(0xFF003D4A)
+// Surface & Backgrounds
+val SurfaceLight = Color(0xFFF8FAFC)
+val SurfaceCardLight = Color(0xFFFFFFFF)
+val SurfaceBorderLight = Color(0xFFE2E8F0)
+val TextPrimaryLight = Color(0xFF0F172A)
+val TextSecondaryLight = Color(0xFF64748B)
 
-// Dark Scheme
-val DarkHyperBluePrimary = Color(0xFF82B1FF)
-val DarkHyperBluePrimaryContainer = Color(0xFF0038A8)
-val DarkBackground = Color(0xFF000000)
-val DarkSurface = Color(0xFF1C1C1E)
-val DarkSurfaceVariant = Color(0xFF2C2C2E)
+val SurfaceDark = Color(0xFF0B0F19)
+val SurfaceCardDark = Color(0xFF131B2E)
+val SurfaceBorderDark = Color(0xFF1E293B)
+val TextPrimaryDark = Color(0xFFF1F5F9)
+val TextSecondaryDark = Color(0xFF94A3B8)
 
-// Light Scheme Backgrounds
-val LightBackground = Color(0xFFF2F2F7) // iOS/HyperOS typical background
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE5E5EA)
-
-// Timetable Course Color Palette (HyperOS Vibrant/Pastel)
 val CoursePalette = listOf(
-    Color(0xFF337DFF), // Hyper Blue
-    Color(0xFF32C5E9), // Cyan
-    Color(0xFF34C759), // Green
-    Color(0xFFFF9500), // Orange
-    Color(0xFFFF2D55), // Pink
-    Color(0xFFAF52DE), // Purple
-    Color(0xFF5856D6), // Indigo
-    Color(0xFFFFCC00)  // Yellow
+    Color(0xFF4F46E5), // Indigo
+    Color(0xFF0284C7), // Sky blue
+    Color(0xFF059669), // Emerald
+    Color(0xFFD97706), // Amber
+    Color(0xFFE11D48), // Rose
+    Color(0xFF7C3AED), // Purple
+    Color(0xFF0D9488), // Teal
+    Color(0xFFEA580C), // Orange
+    Color(0xFF2563EB), // Blue
+    Color(0xFFDB2777), // Pink
+    Color(0xFF16A34A), // Green
+    Color(0xFF9333EA)  // Violet
 )

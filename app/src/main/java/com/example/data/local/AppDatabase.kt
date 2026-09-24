@@ -1,40 +1,22 @@
 package com.example.data.local
 
 import android.content.Context
-import androidx.room.*
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.example.data.model.*
-
-class Converters {
-    @TypeConverter
-    fun fromWeekRule(rule: WeekRule): String = rule.name
-
-    @TypeConverter
-    fun toWeekRule(value: String): WeekRule = try {
-        WeekRule.valueOf(value)
-    } catch (e: Exception) {
-        WeekRule.ALL
-    }
-
-    @TypeConverter
-    fun fromHolidayOverrideType(type: HolidayOverrideType): String = type.name
-
-    @TypeConverter
-    fun toHolidayOverrideType(value: String): HolidayOverrideType = try {
-        HolidayOverrideType.valueOf(value)
-    } catch (e: Exception) {
-        HolidayOverrideType.HOLIDAY
-    }
-}
 
 @Database(
     entities = [
         SemesterEntity::class,
-        CourseEntity::class,
+        Course::class,
         ExamEntity::class,
-        TaskEntity::class,
-        HolidayOverrideEntity::class
+        Task::class,
+        HolidayOverrideEntity::class,
+        NoteEntity::class
     ],
-    version = 1,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -44,6 +26,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun examDao(): ExamDao
     abstract fun taskDao(): TaskDao
     abstract fun holidayOverrideDao(): HolidayOverrideDao
+    abstract fun noteDao(): NoteDao
 
     companion object {
         @Volatile
@@ -54,11 +37,14 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "myschedule.db"
-                ).fallbackToDestructiveMigration().build()
+                    "courses_schedule.db"
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
         }
     }
 }
+

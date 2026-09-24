@@ -13,6 +13,7 @@ class ScheduleRepository(val database: AppDatabase) {
     val allTasks: Flow<List<TaskEntity>> = database.taskDao().getAllTasks()
     val pendingTasks: Flow<List<TaskEntity>> = database.taskDao().getPendingTasks()
     val allHolidayOverrides: Flow<List<HolidayOverrideEntity>> = database.holidayOverrideDao().getAllHolidayOverrides()
+    val allNotes: Flow<List<com.example.data.model.NoteEntity>> = database.noteDao().getAllNotes()
 
     fun getCoursesBySemester(semesterId: Long): Flow<List<CourseEntity>> =
         database.courseDao().getCoursesBySemester(semesterId)
@@ -41,11 +42,38 @@ class ScheduleRepository(val database: AppDatabase) {
     suspend fun insertCourse(course: CourseEntity): Long =
         database.courseDao().insertCourse(course)
 
+    suspend fun insertCourses(courses: List<CourseEntity>) =
+        database.courseDao().insertCourses(courses)
+
     suspend fun updateCourse(course: CourseEntity) =
         database.courseDao().updateCourse(course)
 
     suspend fun deleteCourse(course: CourseEntity) =
         database.courseDao().deleteCourse(course)
+
+    suspend fun clearCoursesBySemester(semesterId: Long) =
+        database.courseDao().deleteCoursesBySemester(semesterId)
+
+    suspend fun deduplicateCourses(semesterId: Long) {
+        val all = database.courseDao().getCoursesBySemesterSync(semesterId)
+        val seen = mutableSetOf<String>()
+        val duplicatesToDelete = mutableListOf<CourseEntity>()
+
+        for (c in all) {
+            // Unify course duplicate identification by name or code and schedule timing
+            val normName = c.name.replace(Regex("""[\[\(（【]国际学生[\]\)）】]"""), "").trim().lowercase()
+            val timingKey = "${c.dayOfWeek}_${c.startPeriod}_${c.endPeriod}_${c.customWeeks.trim()}"
+            val key = if (c.code.isNotBlank()) "${c.code.trim()}_$timingKey" else "${normName}_$timingKey"
+
+            if (!seen.add(key)) {
+                duplicatesToDelete.add(c)
+            }
+        }
+
+        for (dup in duplicatesToDelete) {
+            database.courseDao().deleteCourse(dup)
+        }
+    }
 
     suspend fun insertExam(exam: ExamEntity): Long =
         database.examDao().insertExam(exam)
@@ -71,16 +99,15 @@ class ScheduleRepository(val database: AppDatabase) {
     suspend fun populateInitialDataIfEmpty() {
         val existing = database.semesterDao().getActiveSemesterSync()
         if (existing == null) {
-            // Create current semester starting on the most recent Monday
-            val today = LocalDate.now()
-            val startMonday = today.minusDays((today.dayOfWeek.value - DayOfWeek.MONDAY.value).toLong())
-            val startMillis = startMonday.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            // Fall 2026 Academic Term (Starts Aug 31, 2026)
+            val startDate = java.time.LocalDate.of(2026, 8, 31)
+            val startMillis = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
             val semId = database.semesterDao().insertSemester(
-                SemesterEntity(
-                    name = "Fall 2026 Academic Term",
+                com.example.data.model.SemesterEntity(
+                    name = "2026-2027 Fall Semester",
                     startDateMillis = startMillis,
-                    totalWeeks = 16,
+                    totalWeeks = 20,
                     isActive = true
                 )
             )
@@ -97,7 +124,7 @@ class ScheduleRepository(val database: AppDatabase) {
                     startPeriod = 1,
                     endPeriod = 2,
                     startTime = "08:00",
-                    endTime = "09:40",
+                    endTime = "09:35",
                     weekRule = WeekRule.ALL,
                     colorHex = 0xFF4F46E5, // Indigo
                     dndEnabled = true,
@@ -161,7 +188,7 @@ class ScheduleRepository(val database: AppDatabase) {
                     startPeriod = 1,
                     endPeriod = 2,
                     startTime = "08:00",
-                    endTime = "09:40",
+                    endTime = "09:35",
                     weekRule = WeekRule.CUSTOM,
                     customWeeks = "1-8,10-16",
                     colorHex = 0xFF7C3AED, // Violet
@@ -194,7 +221,7 @@ class ScheduleRepository(val database: AppDatabase) {
                     startPeriod = 1,
                     endPeriod = 2,
                     startTime = "08:00",
-                    endTime = "09:40",
+                    endTime = "09:35",
                     weekRule = WeekRule.EVEN,
                     colorHex = 0xFFDC2626, // Crimson
                     dndEnabled = true,
@@ -235,24 +262,19 @@ class ScheduleRepository(val database: AppDatabase) {
                 )
             )
 
-            // Insert preloaded holiday & make-up overrides (e.g. Mid-Autumn Festival & National Day Holiday + Weekend Make-Up Day)
+            // SWPU Academic Calendar 2026-2027 Holidays
             val holidays = listOf(
-                HolidayOverrideEntity(
-                    name = "Mid-Autumn Festival Holiday",
-                    dateString = today.plusDays(4).toString(),
-                    type = HolidayOverrideType.HOLIDAY
-                ),
-                HolidayOverrideEntity(
-                    name = "National Day Holiday Break",
-                    dateString = today.plusDays(18).toString(),
-                    type = HolidayOverrideType.HOLIDAY
-                ),
-                HolidayOverrideEntity(
-                    name = "Weekend Make-up Day (调休 -> Monday)",
-                    dateString = today.plusDays(5).toString(), // e.g. Upcoming weekend
-                    type = HolidayOverrideType.MAKE_UP,
-                    targetDayOfWeek = 1 // Follows Monday timetable
-                )
+                com.example.data.model.HolidayOverrideEntity(name = "Mid-Autumn Festival (中秋节)", dateString = "2026-09-25", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "Mid-Autumn Festival (中秋节)", dateString = "2026-09-26", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "Mid-Autumn Festival (中秋节)", dateString = "2026-09-27", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-01", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-02", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-03", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-04", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-05", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-06", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "National Day (国庆节)", dateString = "2026-10-07", type = com.example.data.model.HolidayOverrideType.HOLIDAY),
+                com.example.data.model.HolidayOverrideEntity(name = "New Year's Day (元旦)", dateString = "2027-01-01", type = com.example.data.model.HolidayOverrideType.HOLIDAY)
             )
             database.holidayOverrideDao().insertOverrides(holidays)
         }

@@ -1,6 +1,8 @@
 {
-  "name": "MySchedule",
-  "description": "Offline-first personal course assistant for university students with timetable, DND automation, and task tracker",
+  "name": "Course Schedule",
+  "description": "Smart student course schedule and timetable manager with multi-format schedule import (CSV, Excel, PDF, Camera OCR), conflict detection, and weekly timetable view.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

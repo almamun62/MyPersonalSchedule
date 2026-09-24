@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.content.Intent
+import com.example.ui.theme.tr
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -24,19 +25,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.viewmodel.ChatViewModel
 import android.speech.tts.TextToSpeech
 import java.util.Locale
 
+import com.example.ui.viewmodel.ScheduleViewModel
+import com.example.data.local.UserPreferencesManager
+
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
+fun ChatScreen(
+    scheduleViewModel: ScheduleViewModel,
+    viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    onNavigateBack: (() -> Unit)? = null
+) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isRecording by viewModel.isRecording.collectAsStateWithLifecycle()
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    
+    val prefs = remember { UserPreferencesManager.getInstance(context) }
+    val apiKey by prefs.geminiApiKey.collectAsStateWithLifecycle()
+    val aiBaseUrl by prefs.aiBaseUrl.collectAsStateWithLifecycle()
+    val aiModelName by prefs.aiModelName.collectAsStateWithLifecycle()
+    val scheduleState by scheduleViewModel.uiState.collectAsStateWithLifecycle()
 
     val tts = remember {
         var ttsInstance: TextToSpeech? = null
@@ -67,7 +88,8 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            startListening(speechRecognizer, viewModel)
+            val contextData = "Courses: ${scheduleState.courses.joinToString { it.name }}. Tasks: ${scheduleState.tasks.joinToString { it.title }}"
+            startListening(speechRecognizer, viewModel, apiKey ?: "", contextData, aiBaseUrl ?: "", aiModelName ?: "")
         } else {
             Toast.makeText(context, "Microphone permission is required for voice chat.", Toast.LENGTH_SHORT).show()
         }
@@ -87,6 +109,19 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        if (onNavigateBack != null) {
+            TopAppBar(
+                title = { Text("AI Chat Assistant".tr, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back".tr)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -119,7 +154,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Ask Gemini...") },
+                    placeholder = { Text("Ask Gemini...".tr) },
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
@@ -150,7 +185,8 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                 } else {
                     FloatingActionButton(
                         onClick = {
-                            viewModel.sendMessage(inputText)
+                            val contextData = "Courses: ${scheduleState.courses.joinToString { it.name }}. Tasks: ${scheduleState.tasks.joinToString { it.title }}"
+                            viewModel.sendMessage(inputText, apiKey ?: "", contextData, aiBaseUrl ?: "", aiModelName ?: "")
                             inputText = ""
                         },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -158,7 +194,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
                     ) {
                         Icon(
                             imageVector = Icons.Default.Send,
-                            contentDescription = "Send Message",
+                            contentDescription = "Send Message".tr,
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
@@ -168,7 +204,7 @@ fun ChatScreen(viewModel: ChatViewModel = androidx.lifecycle.viewmodel.compose.v
     }
 }
 
-private fun startListening(speechRecognizer: SpeechRecognizer?, viewModel: ChatViewModel) {
+private fun startListening(speechRecognizer: SpeechRecognizer?, viewModel: ChatViewModel, apiKey: String, contextData: String, aiBaseUrl: String, aiModelName: String) {
     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -186,7 +222,7 @@ private fun startListening(speechRecognizer: SpeechRecognizer?, viewModel: ChatV
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             if (!matches.isNullOrEmpty()) {
-                viewModel.sendMessage(matches[0])
+                viewModel.sendMessage(matches[0], apiKey, contextData, aiBaseUrl, aiModelName)
             }
             viewModel.setRecording(false)
         }
@@ -243,7 +279,7 @@ fun ChatBubble(
                         color = contentColor
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Gemini is thinking...", color = contentColor, style = MaterialTheme.typography.bodyMedium)
+                    Text("Gemini is thinking...".tr, color = contentColor, style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
                 Text(
