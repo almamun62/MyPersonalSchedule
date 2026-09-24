@@ -418,6 +418,28 @@ fun SettingsScreen(
                 }
             }
 
+            // Chinese Phone Compatibility & Alarms Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Chinese Phone Compatibility & Alarms".tr,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Text(
+                        "To ensure class reminders and alarms fire reliably on Xiaomi, Huawei, Vivo, Oppo, and HarmonyOS devices, please allow Autostart and disable battery optimization for this app in your system settings.".tr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // Danger Zone
             Card(
                 shape = RoundedCornerShape(16.dp),

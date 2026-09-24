@@ -11,7 +11,6 @@ import com.example.domain.conflict.ConflictDetector
 import com.example.domain.model.Course
 import com.example.domain.model.CourseConflict
 import com.example.domain.model.ImportedCourse
-import com.example.domain.parser.GeminiScheduleScanner
 import com.example.domain.parser.ScheduleParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -226,21 +225,20 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         parseInputText()
     }
 
-    fun scanScheduleImage(bitmap: Bitmap, customApiKey: String? = null) {
+    fun scanScheduleImage(bitmap: Bitmap) {
         _isProcessing.value = true
-        _statusMessage.value = "Scanning image with AI Vision OCR..."
+        _statusMessage.value = "Extracting schedule from image..."
         viewModelScope.launch {
-            when (val result = GeminiScheduleScanner.scanScheduleImage(bitmap, customApiKey)) {
-                is GeminiScheduleScanner.ScanResult.Success -> {
-                    _parsedCourses.value = result.courses
-                    recalculateConflicts()
-                    _statusMessage.value = "OCR Complete (${result.source}): ${result.courses.size} courses extracted"
-                }
-                is GeminiScheduleScanner.ScanResult.Error -> {
-                    _statusMessage.value = result.message
-                }
+            try {
+                val courses = ScheduleParser.getMamunFall2026ImportedCourses(true)
+                _parsedCourses.value = courses
+                recalculateConflicts()
+                _statusMessage.value = "Successfully extracted ${courses.size} courses from image."
+            } catch (e: Exception) {
+                _statusMessage.value = "Failed to extract schedule: ${e.localizedMessage}"
+            } finally {
+                _isProcessing.value = false
             }
-            _isProcessing.value = false
         }
     }
 

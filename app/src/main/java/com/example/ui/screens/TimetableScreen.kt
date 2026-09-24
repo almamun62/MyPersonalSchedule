@@ -654,34 +654,15 @@ fun WeekdayDateStrip(
     selectedDay: Int,
     onSelectDay: (Int) -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        // Month Column (e.g. "9月")
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(48.dp)
-        ) {
-            Text(
-                text = "${month}月",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                fontSize = 14.sp
-            )
-            Text(
-                text = "Month",
-                style = MaterialTheme.typography.labelSmall,
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        // 7 Days
         Row(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             for (d in 1..7) {
@@ -692,30 +673,30 @@ fun WeekdayDateStrip(
                 val isEnglish = currentLang == "en" || !currentLang.startsWith("zh")
                 val dayLabel = if (isEnglish) DAYS_ENGLISH[d - 1] else DAYS_CHINESE[d - 1].second
 
-                Box(
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isSelected) Color(0xFF262A33) else Color.Transparent
-                        )
+                        .padding(horizontal = 3.dp)
                         .clickable { onSelectDay(d) }
-                        .padding(vertical = 6.dp),
-                    contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = dayNumber.toString(),
-                            fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                    ) {
                         Text(
                             text = dayLabel,
                             fontSize = 11.sp,
-                            color = if (isSelected) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = dayNumber.toString(),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }

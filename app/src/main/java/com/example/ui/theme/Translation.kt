@@ -482,7 +482,9 @@ val UI_TRANSLATIONS = mapOf(
     "Live Status Notification" to "实时状态通知",
     "Shows remaining duration of current class & name of next upcoming class in status bar." to "在状态栏中显示当前课程剩余时间及下一节课名称。",
     "Show Live Status Notification" to "显示实时状态通知",
-    "Export to System Calendar (.ics)" to "导出至系统日历 (.ics)"
+    "Export to System Calendar (.ics)" to "导出至系统日历 (.ics)",
+    "Chinese Phone Compatibility & Alarms" to "国产手机兼容与闹钟提醒设置",
+    "To ensure class reminders and alarms fire reliably on Xiaomi, Huawei, Vivo, Oppo, and HarmonyOS devices, please allow Autostart and disable battery optimization for this app in your system settings." to "为确保在小米、华为、vivo、oppo及鸿蒙系统中可靠触发课程闹钟与提醒，请在系统设置中允许本应用的自启动权限并关闭电池优化限制。"
 )
 
 val String.tr: String
