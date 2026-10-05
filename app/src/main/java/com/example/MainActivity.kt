@@ -62,6 +62,7 @@ fun MainAppScaffold(
     importViewModel: ImportViewModel
 ) {
     var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    var showAcademicCalendarModal by remember { mutableStateOf(false) }
 
     if (currentScreen != Screen.DASHBOARD) {
         BackHandler {
@@ -114,12 +115,14 @@ fun MainAppScaffold(
                 Screen.TIMETABLE -> TimetableScreen(
                     viewModel = scheduleViewModel,
                     onNavigateToImport = { currentScreen = Screen.IMPORT },
-                    onNavigateToCourses = { currentScreen = Screen.COURSES }
+                    onNavigateToCourses = { currentScreen = Screen.COURSES },
+                    onOpenAcademicCalendar = { showAcademicCalendarModal = true }
                 )
                 Screen.DASHBOARD -> DashboardScreen(
                     viewModel = scheduleViewModel,
                     onNavigateToTimetable = { currentScreen = Screen.TIMETABLE },
-                    onNavigateToTasks = { currentScreen = Screen.TASKS }
+                    onNavigateToTasks = { currentScreen = Screen.TASKS },
+                    onOpenAcademicCalendar = { showAcademicCalendarModal = true }
                 )
                 Screen.TASKS -> TasksExamsScreen(
                     viewModel = scheduleViewModel
@@ -141,6 +144,14 @@ fun MainAppScaffold(
                 )
                 Screen.ABOUT -> AboutScreen()
             }
+
+            if (showAcademicCalendarModal) {
+                com.example.ui.components.AcademicCalendarDialog(
+                    viewModel = scheduleViewModel,
+                    onDismiss = { showAcademicCalendarModal = false }
+                )
+            }
         }
     }
 }
+

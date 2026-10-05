@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import com.example.data.local.AppDatabase
+import com.example.data.model.AcademicCalendarFileEntity
 import com.example.data.model.Course
 import com.example.data.model.CourseEntity
 import com.example.data.model.ExamEntity
@@ -25,4 +26,9 @@ class ScheduleRepository(val database: AppDatabase) {
     suspend fun insertTask(task: Task): Long = database.taskDao().insertTask(task)
     suspend fun updateTask(task: Task) = database.taskDao().updateTask(task)
     suspend fun deleteTask(task: Task) = database.taskDao().deleteTask(task)
+
+    fun getAllCalendarFiles(): Flow<List<AcademicCalendarFileEntity>> = database.academicCalendarFileDao().getAllCalendarFiles()
+    suspend fun insertCalendarFile(file: AcademicCalendarFileEntity): Long = database.academicCalendarFileDao().insertCalendarFile(file)
+    suspend fun deleteCalendarFile(file: AcademicCalendarFileEntity) = database.academicCalendarFileDao().deleteCalendarFile(file)
 }
+

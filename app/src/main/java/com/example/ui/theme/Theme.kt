@@ -9,14 +9,6 @@ val BgDark = Color(0xFF0B0F17)
 val SurfaceDark = Color(0xFF131B26)
 val SurfaceVariantDark = Color(0xFF182230)
 val CardBorderDark = Color(0xFF1F2D3F)
-val BlueAccent = Color(0xFFA8C7FA)
-val OnBlueAccent = Color(0xFF0B1A2D)
-val BlueContainer = Color(0xFF162942)
-val OnBlueContainer = Color(0xFFD3E3FD)
-val SecondaryContainerDark = Color(0xFF1C2E46)
-val PurpleBreak = Color(0xFF2C1E38)
-val PurpleBreakBorder = Color(0xFF3F2652)
-val PurpleBreakText = Color(0xFFE4C7FA)
 val TextPrimary = Color(0xFFFFFFFF)
 val TextSecondary = Color(0xFF94A3B8)
 
@@ -27,23 +19,39 @@ fun CourseScheduleTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themeMode) {
+    val systemInDark = isSystemInDarkTheme()
+    val isDarkTheme = when (themeMode) {
         AppThemeMode.LIGHT -> false
         AppThemeMode.DARK -> true
-        AppThemeMode.SYSTEM -> true
+        AppThemeMode.SYSTEM -> systemInDark
     }
 
+    // Base accent primary color from selected AppAccentColor
+    val primaryColor = accentColor.primary
+
+    // High contrast primary variant for dark theme
+    val primaryDark = when (accentColor) {
+        AppAccentColor.BLUE -> Color(0xFFA8C7FA)
+        AppAccentColor.EMERALD -> Color(0xFF6EE7B7)
+        AppAccentColor.AMBER -> Color(0xFFFCD34D)
+        AppAccentColor.PURPLE -> Color(0xFFC084FC)
+        AppAccentColor.ROSE -> Color(0xFFFDA4AF)
+    }
+
+    val activePrimary = if (isDarkTheme) primaryDark else primaryColor
+
     val darkColorScheme = darkColorScheme(
-        primary = BlueAccent,
-        onPrimary = OnBlueAccent,
-        secondary = BlueAccent.copy(alpha = 0.8f),
-        tertiary = PurpleBreakText,
+        primary = activePrimary,
+        onPrimary = Color(0xFF0B1A2D),
+        secondary = activePrimary.copy(alpha = 0.85f),
+        onSecondary = Color.White,
+        tertiary = activePrimary.copy(alpha = 0.7f),
         background = BgDark,
         surface = SurfaceDark,
         surfaceVariant = SurfaceVariantDark,
-        primaryContainer = BlueContainer,
-        onPrimaryContainer = OnBlueContainer,
-        secondaryContainer = SecondaryContainerDark,
+        primaryContainer = activePrimary.copy(alpha = 0.2f),
+        onPrimaryContainer = activePrimary,
+        secondaryContainer = Color(0xFF1C2E46),
         onSecondaryContainer = TextPrimary,
         outline = CardBorderDark,
         outlineVariant = Color(0xFF182536),
@@ -53,15 +61,16 @@ fun CourseScheduleTheme(
     )
 
     val lightColorScheme = lightColorScheme(
-        primary = Color(0xFF2563EB),
+        primary = activePrimary,
         onPrimary = Color.White,
-        secondary = Color(0xFF3B82F6),
-        tertiary = Color(0xFF7C3AED),
+        secondary = activePrimary.copy(alpha = 0.85f),
+        onSecondary = Color.White,
+        tertiary = activePrimary.copy(alpha = 0.7f),
         background = Color(0xFFF8FAFC),
         surface = Color.White,
         surfaceVariant = Color(0xFFF1F5F9),
-        primaryContainer = Color(0xFFDBEAFE),
-        onPrimaryContainer = Color(0xFF1E40AF),
+        primaryContainer = activePrimary.copy(alpha = 0.15f),
+        onPrimaryContainer = activePrimary,
         secondaryContainer = Color(0xFFE2E8F0),
         onSecondaryContainer = Color(0xFF1E293B),
         outline = Color(0xFFCBD5E1),
@@ -72,7 +81,7 @@ fun CourseScheduleTheme(
     )
 
     MaterialTheme(
-        colorScheme = if (darkTheme) darkColorScheme else lightColorScheme,
+        colorScheme = if (isDarkTheme) darkColorScheme else lightColorScheme,
         typography = Typography,
         content = content
     )

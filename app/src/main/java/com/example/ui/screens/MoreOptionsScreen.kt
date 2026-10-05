@@ -569,20 +569,12 @@ fun MoreOptionsScreen(
     }
 
     if (showCalendarModal) {
-        AlertDialog(
-            onDismissRequest = { showCalendarModal = false },
-            icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp)) },
-            title = { Text("SWPU Academic Calendar", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Fall 2026 Semester: Sept 7, 2026 – Jan 15, 2027 (16 Weeks). Midterm break and holiday overrides are automatically calculated.")
-            },
-            confirmButton = {
-                TextButton(onClick = { showCalendarModal = false }) {
-                    Text("Close")
-                }
-            }
+        com.example.ui.components.AcademicCalendarDialog(
+            viewModel = viewModel,
+            onDismiss = { showCalendarModal = false }
         )
     }
+
 
     if (showHelpModal) {
         com.example.ui.components.HowToUseDialog(

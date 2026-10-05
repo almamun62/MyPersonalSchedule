@@ -106,3 +106,17 @@ data class HolidayOverrideEntity(
     val type: HolidayOverrideType,
     val targetDayOfWeek: Int = 1
 )
+
+@Entity(tableName = "academic_calendar_files")
+data class AcademicCalendarFileEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val fileName: String,
+    val fileType: String, // "PHOTO", "PDF", "WORD", "EXCEL", "OTHER"
+    val mimeType: String,
+    val localPath: String,
+    val fileSizeBytes: Long,
+    val addedAtMillis: Long = System.currentTimeMillis(),
+    val note: String = ""
+)
+

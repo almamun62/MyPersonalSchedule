@@ -77,8 +77,10 @@ fun Course.getEndPeriod(timings: List<SectionTiming>): Int {
 fun TimetableScreen(
     viewModel: ScheduleViewModel,
     onNavigateToImport: () -> Unit,
-    onNavigateToCourses: (() -> Unit)? = null
+    onNavigateToCourses: (() -> Unit)? = null,
+    onOpenAcademicCalendar: (() -> Unit)? = null
 ) {
+
     val selectedDay by viewModel.selectedDay.collectAsStateWithLifecycle()
     val selectedWeek by viewModel.selectedWeek.collectAsStateWithLifecycle()
     val allCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
@@ -99,10 +101,11 @@ fun TimetableScreen(
     val selectedDayName = dayNamesShort.getOrNull(selectedDay - 1) ?: "Sun"
 
     Scaffold(
-        containerColor = Color(0xFF0B0F17),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0B0F17)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+
                 title = {
                     Column {
                         Row(
@@ -155,9 +158,13 @@ fun TimetableScreen(
                     }) {
                         Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
                     }
+                    IconButton(onClick = { onOpenAcademicCalendar?.invoke() }) {
+                        Icon(Icons.Outlined.CalendarMonth, contentDescription = "Academic Calendar", tint = Color(0xFFA8C7FA))
+                    }
                     IconButton(onClick = onNavigateToImport) {
                         Icon(Icons.Outlined.FileDownload, contentDescription = "Import", tint = Color.White)
                     }
+
                     IconButton(onClick = { /* Share */ }) {
                         Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White)
                     }
@@ -189,13 +196,17 @@ fun TimetableScreen(
                         showAddCourseDialog = true
                     },
                     shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA8C7FA)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF0F1E33), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Course", color = Color(0xFF0F1E33), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Add Course", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
+
             }
         }
     ) { innerPadding ->
@@ -212,14 +223,16 @@ fun TimetableScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Leftmost "Oct" icon card
+                // Leftmost "Oct" icon card (Clickable to open Academic Calendar Vault)
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = Color(0xFF182230),
                     modifier = Modifier
                         .width(44.dp)
                         .height(64.dp)
+                        .clickable { onOpenAcademicCalendar?.invoke() }
                 ) {
+
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,

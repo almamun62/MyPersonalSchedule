@@ -34,10 +34,13 @@ import java.time.format.DateTimeFormatter
 fun DashboardScreen(
     viewModel: ScheduleViewModel,
     onNavigateToTimetable: () -> Unit,
-    onNavigateToTasks: () -> Unit
+    onNavigateToTasks: () -> Unit,
+    onOpenAcademicCalendar: (() -> Unit)? = null
 ) {
+
     val allCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
     val allTasks by viewModel.allTasks.collectAsStateWithLifecycle()
+    val allExams by viewModel.allExams.collectAsStateWithLifecycle()
 
     var smartWakeEnabled by remember { mutableStateOf(true) }
     var classAlertsEnabled by remember { mutableStateOf(true) }
@@ -54,8 +57,9 @@ fun DashboardScreen(
     val pendingTasks = remember(allTasks) { allTasks.filter { !it.isCompleted } }
 
     Scaffold(
-        containerColor = Color(0xFF0B0F17)
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -119,26 +123,147 @@ fun DashboardScreen(
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = Color(0xFF0C1929),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenAcademicCalendar?.invoke() }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.BeachAccess,
+                                    contentDescription = null,
+                                    tint = Color(0xFFA8C7FA),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = "National Day Holiday (Oct 1 - Oct 7)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFFE2E8F0)
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Outlined.ChevronRight,
+                                contentDescription = null,
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+
+                    if (onOpenAcademicCalendar != null) {
+                        Button(
+                            onClick = { onOpenAcademicCalendar.invoke() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A5F))
                         ) {
                             Icon(
-                                Icons.Outlined.BeachAccess,
+                                Icons.Outlined.CalendarMonth,
                                 contentDescription = null,
                                 tint = Color(0xFFA8C7FA),
                                 modifier = Modifier.size(18.dp)
                             )
-                            Column {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Academic Calendar Vault (Photo, PDF, Word, Excel)",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+
+            // Exam Countdown Card on Dashboard (Only if less than 14 days left)
+            if (allExams.isNotEmpty()) {
+                val now = System.currentTimeMillis()
+                val nearestExam = allExams.filter { it.examDateMillis >= now - 86400000L }
+                    .minByOrNull { it.examDateMillis }
+                if (nearestExam != null) {
+                    val diffMs = nearestExam.examDateMillis - now
+                    val daysLeft = (diffMs / 86400000L).coerceAtLeast(0)
+
+                    if (daysLeft <= 14L) {
+                        Card(
+                            shape = RoundedCornerShape(22.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2338)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF293B5E)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onNavigateToTasks() }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(18.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.Timer, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(20.dp))
+                                        Text("Upcoming Exam Countdown", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (daysLeft <= 3L) Color(0xFFEF4444) else Color(0xFF0EA5E9)
+                                    ) {
+                                        Text(
+                                            text = if (daysLeft == 0L) "TODAY ⚠️" else "$daysLeft DAYS LEFT",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
                                 Text(
-                                    text = "National Day (国庆节) (2026-10-04)",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFFE2E8F0)
+                                    text = nearestExam.courseName,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 16.sp,
+                                    color = Color.White
                                 )
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "📍 ${nearestExam.classroom.ifBlank { "TBD" }}",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF94A3B8)
+                                    )
+                                    Text(
+                                        text = "⏰ ${nearestExam.startTime} - ${nearestExam.endTime}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF38BDF8)
+                                    )
+                                    if (nearestExam.seatNumber.isNotBlank()) {
+                                        Text(
+                                            text = "🪑 ${nearestExam.seatNumber}",
+                                            fontSize = 12.sp,
+                                            color = Color(0xFFCBD5E1)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

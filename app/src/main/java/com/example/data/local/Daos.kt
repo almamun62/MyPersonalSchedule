@@ -72,3 +72,19 @@ interface TaskDao {
     @Delete
     suspend fun deleteTask(task: Task)
 }
+
+@Dao
+interface AcademicCalendarFileDao {
+    @Query("SELECT * FROM academic_calendar_files ORDER BY addedAtMillis DESC")
+    fun getAllCalendarFiles(): Flow<List<AcademicCalendarFileEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCalendarFile(file: AcademicCalendarFileEntity): Long
+
+    @Delete
+    suspend fun deleteCalendarFile(file: AcademicCalendarFileEntity)
+
+    @Query("DELETE FROM academic_calendar_files WHERE id = :id")
+    suspend fun deleteCalendarFileById(id: Long)
+}
+

@@ -14,9 +14,10 @@ import com.example.data.model.*
         ExamEntity::class,
         Task::class,
         NotebookEntity::class,
-        NoteEntity::class
+        NoteEntity::class,
+        AcademicCalendarFileEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -27,6 +28,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun notebookDao(): NotebookDao
     abstract fun noteDao(): NoteDao
+    abstract fun academicCalendarFileDao(): AcademicCalendarFileDao
+
 
     companion object {
         @Volatile

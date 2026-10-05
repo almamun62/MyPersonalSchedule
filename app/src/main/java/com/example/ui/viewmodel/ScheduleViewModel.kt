@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
 import com.example.data.local.UserPreferencesManager
+import com.example.data.model.AcademicCalendarFileEntity
 import com.example.data.model.Course
 import com.example.data.model.CourseEntity
 import com.example.data.model.ExamEntity
@@ -15,6 +16,7 @@ import com.example.domain.model.ImportedCourse
 import com.example.domain.parser.ScheduleParser
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDate
 
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
@@ -26,10 +28,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allExams: StateFlow<List<ExamEntity>> = repository.getAllExams()
+        .map { list -> list.distinctBy { it.courseName + "_" + it.startTime } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allTasks: StateFlow<List<Task>> = repository.getAllTasks()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allCalendarFiles: StateFlow<List<AcademicCalendarFileEntity>> = repository.getAllCalendarFiles()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
 
     private val _selectedDay = MutableStateFlow(LocalDate.now().dayOfWeek.value)
     val selectedDay: StateFlow<Int> = _selectedDay.asStateFlow()
@@ -55,6 +62,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             val list = allCourses.first()
             if (list.isEmpty()) {
                 loadMamunPresetSchedule()
+            }
+            val exams = allExams.first()
+            if (exams.isEmpty()) {
+                loadPresetExams()
             }
         }
     }
@@ -115,7 +126,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun addExam(courseName: String, classroom: String, dateMillis: Long, sTime: String, eTime: String) {
+    fun addExam(courseName: String, classroom: String, dateMillis: Long, sTime: String, eTime: String, seatNumber: String = "") {
         viewModelScope.launch {
             repository.insertExam(
                 ExamEntity(
@@ -123,7 +134,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     classroom = classroom,
                     examDateMillis = dateMillis,
                     startTime = sTime,
-                    endTime = eTime
+                    endTime = eTime,
+                    seatNumber = seatNumber
                 )
             )
         }
@@ -149,4 +161,58 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             repository.insertCourses(entities)
         }
     }
+
+    fun loadPresetExams() {
+        viewModelScope.launch {
+            val existing = repository.getAllExams().first()
+            if (existing.isNotEmpty()) return@launch
+            val now = System.currentTimeMillis()
+            val dayMs = 86400000L
+            repository.insertExam(
+                ExamEntity(
+                    courseName = "Computer Architecture Final Exam",
+                    classroom = "Mingli Hall B105",
+                    examDateMillis = now + 12 * dayMs,
+                    startTime = "09:00",
+                    endTime = "11:00",
+                    seatNumber = "Seat #34",
+                    notes = "Bring Student ID & 2B Pencils"
+                )
+            )
+            repository.insertExam(
+                ExamEntity(
+                    courseName = "Database Systems & Application",
+                    classroom = "Software Lab 1",
+                    examDateMillis = now + 18 * dayMs,
+                    startTime = "14:30",
+                    endTime = "16:30",
+                    seatNumber = "Seat #12",
+                    notes = "Open book for SQL chapter 4"
+                )
+            )
+        }
+    }
+
+    fun addCalendarFile(file: AcademicCalendarFileEntity) {
+        viewModelScope.launch {
+            repository.insertCalendarFile(file)
+        }
+    }
+
+    fun deleteCalendarFile(file: AcademicCalendarFileEntity) {
+        viewModelScope.launch {
+            try {
+                if (file.localPath.isNotEmpty()) {
+                    val localF = File(file.localPath)
+                    if (localF.exists()) {
+                        localF.delete()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            repository.deleteCalendarFile(file)
+        }
+    }
 }
+

@@ -81,12 +81,15 @@ data class Course(
         fun fromEntity(entity: CourseEntity): Course {
             val hexString = String.format("#%06X", (0xFFFFFF and entity.colorHex.toInt()))
             val semName = if (entity.semesterId == 1L) "Fall 2026" else "Semester ${entity.semesterId}"
+            val cleanName = com.example.domain.ScheduleTranslationEngine.cleanText(entity.name)
+            val cleanRoom = com.example.domain.ScheduleTranslationEngine.cleanText(entity.classroom)
+            val cleanTeacher = com.example.domain.ScheduleTranslationEngine.cleanText(entity.instructor)
             return Course(
                 id = entity.id,
-                name = entity.name,
+                name = cleanName,
                 code = entity.code,
-                instructor = entity.instructor,
-                classroom = entity.classroom,
+                instructor = cleanTeacher,
+                classroom = cleanRoom,
                 dayOfWeek = entity.dayOfWeek,
                 startPeriod = entity.startPeriod,
                 endPeriod = entity.endPeriod,
