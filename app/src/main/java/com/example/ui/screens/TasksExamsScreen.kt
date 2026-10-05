@@ -1,558 +1,399 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
-import com.example.ui.theme.tr
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.ExamEntity
-import com.example.data.model.TaskEntity
-import com.example.domain.WeeklySummaryEngine
-import com.example.ui.components.AddTaskDialog
-import com.example.ui.viewmodel.ScheduleUiState
+import com.example.data.model.Task
+import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ScheduleViewModel
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 
+enum class TaskTab {
+    TASKS,
+    EXAMS
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TasksExamsScreen(
-    state: ScheduleUiState,
-    viewModel: ScheduleViewModel,
-    modifier: Modifier = Modifier
-) {
-    var selectedTab by remember { mutableStateOf(0) } // 0 = Tasks, 1 = Exams
+fun TasksExamsScreen(viewModel: ScheduleViewModel) {
+    val allTasks by viewModel.allTasks.collectAsStateWithLifecycle()
+    val allExams by viewModel.allExams.collectAsStateWithLifecycle()
+
+    var selectedTab by remember { mutableStateOf(TaskTab.TASKS) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showAddExamDialog by remember { mutableStateOf(false) }
 
+    var newTaskTitle by remember { mutableStateOf("") }
+    var newTaskCourse by remember { mutableStateOf("") }
+    var newTaskPriority by remember { mutableStateOf("MEDIUM") }
+
+    var newExamCourse by remember { mutableStateOf("") }
+    var newExamRoom by remember { mutableStateOf("") }
+    var newExamStartTime by remember { mutableStateOf("09:00") }
+    var newExamEndTime by remember { mutableStateOf("11:00") }
+
+    val completedTasksCount = remember(allTasks) { allTasks.count { it.isCompleted } }
+    val totalTasksCount = remember(allTasks) { allTasks.size }
+    val completionFraction = remember(completedTasksCount, totalTasksCount) {
+        if (totalTasksCount == 0) 0f else completedTasksCount.toFloat() / totalTasksCount.toFloat()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tasks & Exams".tr, fontWeight = FontWeight.Bold) }
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    if (selectedTab == TaskTab.TASKS) showAddTaskDialog = true
+                    else showAddExamDialog = true
+                },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = {
+                    Text(
+                        if (selectedTab == TaskTab.TASKS) "Add Task".tr else "Add Exam".tr,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // 1. Tab Selector
+            PrimaryTabRow(
+                selectedTabIndex = selectedTab.ordinal,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Tab(
+                    selected = selectedTab == TaskTab.TASKS,
+                    onClick = { selectedTab = TaskTab.TASKS },
+                    text = { Text("Tasks & Homework (${allTasks.count { !it.isCompleted }})", fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = selectedTab == TaskTab.EXAMS,
+                    onClick = { selectedTab = TaskTab.EXAMS },
+                    text = { Text("Exams (${allExams.size})", fontWeight = FontWeight.Bold) }
+                )
+            }
+
+            if (selectedTab == TaskTab.TASKS) {
+                // 2. Task Completion Card
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Homework Completion", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("$completedTasksCount of $totalTasksCount completed", fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { completionFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f)
+                        )
+                    }
+                }
+
+                // 3. Task List
+                if (allTasks.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                            Text("No pending tasks!", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Tap + Add Task to schedule homework or study items.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(allTasks) { task ->
+                            val priorityColor = when (task.priority) {
+                                "HIGH" -> MaterialTheme.colorScheme.error
+                                "LOW" -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.tertiary
+                            }
+
+                            Card(
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.toggleTask(task) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Checkbox(
+                                            checked = task.isCompleted,
+                                            onCheckedChange = { viewModel.toggleTask(task) }
+                                        )
+
+                                        Column {
+                                            Text(
+                                                text = task.title,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                                color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            if (task.courseName.isNotBlank()) {
+                                                Text("Course: ${task.courseName}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = priorityColor.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = task.priority,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = priorityColor,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+
+                                        IconButton(onClick = { viewModel.deleteTask(task) }) {
+                                            Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // EXAMS TAB
+                if (allExams.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Outlined.Notifications, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                            Text("No upcoming exams scheduled", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Tap + Add Exam to record exam dates & locations.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(allExams) { exam ->
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(14.dp)
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(exam.courseName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("📍 ${exam.classroom.ifBlank { "TBD" }}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("⏰ ${exam.startTime} - ${exam.endTime}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+
+                                    IconButton(onClick = { viewModel.deleteExam(exam) }) {
+                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (showAddTaskDialog) {
-        AddTaskDialog(
-            courses = state.courses,
-            onDismiss = { showAddTaskDialog = false },
-            onConfirm = { title, course, priority ->
-                viewModel.addTask(title, course, priority)
-                showAddTaskDialog = false
+        AlertDialog(
+            onDismissRequest = { showAddTaskDialog = false },
+            title = { Text("Add Homework / Task".tr, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newTaskTitle,
+                        onValueChange = { newTaskTitle = it },
+                        label = { Text("Task Title".tr) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newTaskCourse,
+                        onValueChange = { newTaskCourse = it },
+                        label = { Text("Course Name (Optional)".tr) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("Priority:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf("LOW", "MEDIUM", "HIGH").forEach { p ->
+                            FilterChip(
+                                selected = newTaskPriority == p,
+                                onClick = { newTaskPriority = p },
+                                label = { Text(p, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newTaskTitle.isNotBlank()) {
+                            viewModel.addTask(newTaskTitle.trim(), newTaskCourse.trim(), newTaskPriority)
+                            newTaskTitle = ""
+                            newTaskCourse = ""
+                            showAddTaskDialog = false
+                        }
+                    }
+                ) {
+                    Text("Save".tr)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddTaskDialog = false }) {
+                    Text("Cancel".tr)
+                }
             }
         )
     }
 
     if (showAddExamDialog) {
-        AddExamDialog(
-            semesterId = state.activeSemester?.id ?: 1,
-            courses = state.courses.map { it.name }.distinct(),
-            onDismiss = { showAddExamDialog = false },
-            onConfirm = { exam ->
-                viewModel.addExam(exam)
-                showAddExamDialog = false
+        AlertDialog(
+            onDismissRequest = { showAddExamDialog = false },
+            title = { Text("Add Exam Schedule".tr, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = newExamCourse,
+                        onValueChange = { newExamCourse = it },
+                        label = { Text("Course Name".tr) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newExamRoom,
+                        onValueChange = { newExamRoom = it },
+                        label = { Text("Classroom Location".tr) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = newExamStartTime,
+                            onValueChange = { newExamStartTime = it },
+                            label = { Text("Start Time") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = newExamEndTime,
+                            onValueChange = { newExamEndTime = it },
+                            label = { Text("End Time") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newExamCourse.isNotBlank()) {
+                            viewModel.addExam(
+                                courseName = newExamCourse.trim(),
+                                classroom = newExamRoom.trim(),
+                                dateMillis = System.currentTimeMillis(),
+                                sTime = newExamStartTime.trim(),
+                                eTime = newExamEndTime.trim()
+                            )
+                            newExamCourse = ""
+                            newExamRoom = ""
+                            showAddExamDialog = false
+                        }
+                    }
+                ) {
+                    Text("Save".tr)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddExamDialog = false }) {
+                    Text("Cancel".tr)
+                }
             }
         )
     }
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (selectedTab == 0 || selectedTab == 1) showAddTaskDialog = true else showAddExamDialog = true
-                },
-                modifier = Modifier
-                    .padding(bottom = 60.dp)
-                    .testTag("fab_add_task_or_exam")
-            ) {
-                Icon(
-                    imageVector = if (selectedTab == 0 || selectedTab == 1) Icons.Default.AddTask else Icons.Default.PostAdd,
-                    contentDescription = "Add".tr
-                )
-            }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // System Segmented Control: Tasks vs Exams
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Tab 0: Tasks
-                    Surface(
-                        onClick = { selectedTab = 0 },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selectedTab == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        shadowElevation = if (selectedTab == 0) 2.dp else 0.dp,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "Tasks".tr,
-                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 13.sp,
-                                color = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (state.pendingTasks.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (selectedTab == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "${state.pendingTasks.size}",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selectedTab == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Tab 1: Exams
-                    Surface(
-                        onClick = { selectedTab = 1 },
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (selectedTab == 1) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        shadowElevation = if (selectedTab == 1) 2.dp else 0.dp,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "Exams".tr,
-                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 13.sp,
-                                color = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (state.exams.isNotEmpty()) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (selectedTab == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "${state.exams.size}",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selectedTab == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (selectedTab == 0) {
-                // Task Tracker using LazyColumn from Room database
-                TaskTrackerContent(
-                    tasks = state.tasks,
-                    courses = state.courses,
-                    onToggleComplete = { taskId, isCompleted ->
-                        viewModel.toggleTaskCompleted(taskId, isCompleted)
-                    },
-                    onDeleteTask = { task ->
-                        viewModel.deleteTask(task)
-                    },
-                    onAddTaskClick = { showAddTaskDialog = true },
-                    showTopBar = false,
-                    showFab = false,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // Exams List
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 96.dp)
-                ) {
-                    if (state.exams.isEmpty()) {
-                        item {
-                            EmptyStateCard(
-                                icon = Icons.Default.EventNote,
-                                message = "No upcoming exams recorded. Add your midterms and finals to see live day countdowns!"
-                            )
-                        }
-                    } else {
-                        items(state.exams, key = { it.id }) { exam ->
-                            ExamCard(exam = exam, onDelete = { viewModel.deleteExam(exam) })
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TaskItemRow(
-    task: TaskEntity,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
-        ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Checkbox(
-                checked = task.isCompleted,
-                onCheckedChange = { onToggle() },
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .testTag("task_checkbox_${task.id}")
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = task.title.trim(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (task.courseName.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Text(
-                                text = task.courseName,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    // Priority tag
-                    val pColor = when (task.priority.uppercase()) {
-                        "HIGH" -> MaterialTheme.colorScheme.error
-                        "MEDIUM" -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.outline
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = pColor.copy(alpha = 0.14f)
-                    ) {
-                        Text(
-                            text = task.priority,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = pColor,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-
-                    // Estimated Study Hours Tag
-                    val taskHours = WeeklySummaryEngine.calculateTaskHours(task)
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0x1810B981)
-                    ) {
-                        Text(
-                            text = "${taskHours}h study",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF059669),
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-            }
-
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete".tr,
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExamCard(
-    exam: ExamEntity,
-    onDelete: () -> Unit
-) {
-    val examDate = Instant.ofEpochMilli(exam.examDateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-    val today = LocalDate.now()
-    val daysLeft = ChronoUnit.DAYS.between(today, examDate)
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // Days Left Countdown Badge
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = when {
-                    daysLeft <= 3 -> MaterialTheme.colorScheme.errorContainer
-                    daysLeft <= 7 -> MaterialTheme.colorScheme.tertiaryContainer
-                    else -> MaterialTheme.colorScheme.primaryContainer
-                },
-                modifier = Modifier.size(60.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "$daysLeft",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = when {
-                            daysLeft <= 3 -> MaterialTheme.colorScheme.onErrorContainer
-                            daysLeft <= 7 -> MaterialTheme.colorScheme.onTertiaryContainer
-                            else -> MaterialTheme.colorScheme.onPrimaryContainer
-                        }
-                    )
-                    Text(
-                        text = if (daysLeft == 1L) "day left" else "days left",
-                        fontSize = 9.sp,
-                        color = when {
-                            daysLeft <= 3 -> MaterialTheme.colorScheme.onErrorContainer
-                            daysLeft <= 7 -> MaterialTheme.colorScheme.onTertiaryContainer
-                            else -> MaterialTheme.colorScheme.onPrimaryContainer
-                        }
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = exam.courseName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Date: ${examDate.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy"))}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "Time: ${exam.startTime} - ${exam.endTime} • Room: ${exam.classroom}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (exam.seatNumber.isNotEmpty()) {
-                    Text("Seat: ${exam.seatNumber}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                }
-                if (exam.notes.isNotEmpty()) {
-                    Text("Note: ${exam.notes}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete".tr, tint = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyStateCard(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
-            Text(message, textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
-}
-
-@Composable
-fun AddExamDialog(
-    semesterId: Long,
-    courses: List<String>,
-    onDismiss: () -> Unit,
-    onConfirm: (ExamEntity) -> Unit
-) {
-    var courseName by remember { mutableStateOf(courses.firstOrNull() ?: "") }
-    var classroom by remember { mutableStateOf("") }
-    var dateString by remember { mutableStateOf(LocalDate.now().plusDays(14).toString()) }
-    var startTime by remember { mutableStateOf("09:00") }
-    var endTime by remember { mutableStateOf("11:00") }
-    var seatNumber by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Exam Countdown".tr) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = courseName,
-                    onValueChange = { courseName = it },
-                    label = { Text("Course Name *".tr) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = dateString,
-                        onValueChange = { dateString = it },
-                        label = { Text("Date (YYYY-MM-DD)".tr) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = classroom,
-                        onValueChange = { classroom = it },
-                        label = { Text("Room *".tr) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startTime,
-                        onValueChange = { startTime = it },
-                        label = { Text("Start Time".tr) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = endTime,
-                        onValueChange = { endTime = it },
-                        label = { Text("End Time".tr) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                OutlinedTextField(
-                    value = seatNumber,
-                    onValueChange = { seatNumber = it },
-                    label = { Text("Seat Number (optional)".tr) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text("Allowed Materials / Notes".tr) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (courseName.isNotBlank() && classroom.isNotBlank()) {
-                        val epochMillis = try {
-                            LocalDate.parse(dateString).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        } catch (e: Exception) {
-                            System.currentTimeMillis() + 86400000L * 14
-                        }
-                        onConfirm(
-                            ExamEntity(
-                                semesterId = semesterId,
-                                courseName = courseName.trim(),
-                                classroom = classroom.trim(),
-                                examDateMillis = epochMillis,
-                                startTime = startTime.trim(),
-                                endTime = endTime.trim(),
-                                seatNumber = seatNumber.trim(),
-                                notes = notes.trim()
-                            )
-                        )
-                    }
-                },
-                enabled = courseName.isNotBlank() && classroom.isNotBlank()
-            ) {
-                Text("Add Exam".tr)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel".tr) }
-        }
-    )
 }

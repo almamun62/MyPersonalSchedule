@@ -1,124 +1,79 @@
 package com.example.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF60A5FA),
-    onPrimary = Color(0xFF0F172A),
-    primaryContainer = Color(0xFF1E3A8A),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondary = Color(0xFF38BDF8),
-    onSecondary = Color(0xFF0F172A),
-    background = SurfaceDark,
-    surface = SurfaceCardDark,
-    onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark,
-    outline = SurfaceBorderDark
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF2563EB),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFDBEAFE),
-    onPrimaryContainer = Color(0xFF1E40AF),
-    secondary = Color(0xFF0284C7),
-    onSecondary = Color.White,
-    background = SurfaceLight,
-    surface = SurfaceCardLight,
-    onBackground = TextPrimaryLight,
-    onSurface = TextPrimaryLight,
-    outline = SurfaceBorderLight
-)
-
-private val EyeCareColorScheme = lightColorScheme(
-    primary = Color(0xFFB45309), // Warm amber
-    onPrimary = Color(0xFFFEF3C7),
-    primaryContainer = Color(0xFFFDE68A),
-    onPrimaryContainer = Color(0xFF78350F),
-    secondary = Color(0xFF92400E),
-    onSecondary = Color(0xFFFEF3C7),
-    background = Color(0xFFFBF7EE), // Warm cream paper background
-    surface = Color(0xFFF5EFE6), // Warm sepia card surface
-    onBackground = Color(0xFF43302B),
-    onSurface = Color(0xFF43302B),
-    outline = Color(0xFFD4C5B9)
-)
+val BgDark = Color(0xFF0B0F17)
+val SurfaceDark = Color(0xFF131B26)
+val SurfaceVariantDark = Color(0xFF182230)
+val CardBorderDark = Color(0xFF1F2D3F)
+val BlueAccent = Color(0xFFA8C7FA)
+val OnBlueAccent = Color(0xFF0B1A2D)
+val BlueContainer = Color(0xFF162942)
+val OnBlueContainer = Color(0xFFD3E3FD)
+val SecondaryContainerDark = Color(0xFF1C2E46)
+val PurpleBreak = Color(0xFF2C1E38)
+val PurpleBreakBorder = Color(0xFF3F2652)
+val PurpleBreakText = Color(0xFFE4C7FA)
+val TextPrimary = Color(0xFFFFFFFF)
+val TextSecondary = Color(0xFF94A3B8)
 
 @Composable
 fun CourseScheduleTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    themeMode: AppThemeMode = AppThemeMode.DARK,
+    accentColor: AppAccentColor = AppAccentColor.BLUE,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val darkTheme = when (themeMode) {
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+        AppThemeMode.SYSTEM -> true
     }
 
+    val darkColorScheme = darkColorScheme(
+        primary = BlueAccent,
+        onPrimary = OnBlueAccent,
+        secondary = BlueAccent.copy(alpha = 0.8f),
+        tertiary = PurpleBreakText,
+        background = BgDark,
+        surface = SurfaceDark,
+        surfaceVariant = SurfaceVariantDark,
+        primaryContainer = BlueContainer,
+        onPrimaryContainer = OnBlueContainer,
+        secondaryContainer = SecondaryContainerDark,
+        onSecondaryContainer = TextPrimary,
+        outline = CardBorderDark,
+        outlineVariant = Color(0xFF182536),
+        onBackground = TextPrimary,
+        onSurface = TextPrimary,
+        onSurfaceVariant = TextSecondary
+    )
+
+    val lightColorScheme = lightColorScheme(
+        primary = Color(0xFF2563EB),
+        onPrimary = Color.White,
+        secondary = Color(0xFF3B82F6),
+        tertiary = Color(0xFF7C3AED),
+        background = Color(0xFFF8FAFC),
+        surface = Color.White,
+        surfaceVariant = Color(0xFFF1F5F9),
+        primaryContainer = Color(0xFFDBEAFE),
+        onPrimaryContainer = Color(0xFF1E40AF),
+        secondaryContainer = Color(0xFFE2E8F0),
+        onSecondaryContainer = Color(0xFF1E293B),
+        outline = Color(0xFFCBD5E1),
+        outlineVariant = Color(0xFFE2E8F0),
+        onBackground = Color(0xFF0F172A),
+        onSurface = Color(0xFF0F172A),
+        onSurfaceVariant = Color(0xFF64748B)
+    )
+
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) darkColorScheme else lightColorScheme,
         typography = Typography,
         content = content
     )
 }
-
-@Composable
-fun MyApplicationTheme(
-    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    accentColor: AppAccentColor = AppAccents.BLUE,
-    darkTheme: Boolean = when (themeMode) {
-        AppThemeMode.DAY -> false
-        AppThemeMode.EYE_CARE -> false
-        AppThemeMode.NIGHT -> true
-        AppThemeMode.SYSTEM -> isSystemInDarkTheme()
-    },
-    dynamicColor: Boolean = true, // Enabled by default for OS-wise Material You dynamic wallpaper colors on Android 12+
-    content: @Composable () -> Unit
-) {
-    val baseColorScheme = when {
-        themeMode == AppThemeMode.EYE_CARE -> EyeCareColorScheme
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
-    val colorScheme = if (themeMode == AppThemeMode.EYE_CARE || (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)) {
-        baseColorScheme
-    } else {
-        baseColorScheme.copy(
-            primary = accentColor.primary,
-            onPrimary = accentColor.onPrimary,
-            primaryContainer = accentColor.primaryContainer,
-            onPrimaryContainer = accentColor.onPrimaryContainer
-        )
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
-}
-
-@Composable
-fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) = CourseScheduleTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, content = content)

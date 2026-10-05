@@ -1,18 +1,59 @@
+# Built application files
+*.apk
+*.aar
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+app/build/
+
+# Gradle files
+.gradle/
+buildOutput.opts
+gradle/configuration-cache/
+
+# Kotlin
+.kotlin/
+.kotlin-daemon/
+
+# Android Studio / IntelliJ IDEA
 *.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+.idea/
+.idea_modules/
+
+# OS specific files
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Sensitive credentials & environment
 local.properties
 .env
-debug.keystore
+*.key
+*.jks
+
+# Temporary patch scripts and logs
+patch_*.py
+fix_*.py
+test*.py
+*.log
+*.patch
+*.diff
+*.tmp
+summary.txt
+__pycache__/
+*.pyc
+

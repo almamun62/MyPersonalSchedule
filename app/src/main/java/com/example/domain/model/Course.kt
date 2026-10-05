@@ -6,14 +6,16 @@ import com.example.data.model.WeekRule
 data class Course(
     val id: Long = 0,
     val name: String,
-    val code: String,
+    val code: String = "",
     val instructor: String = "",
     val classroom: String = "",
-    val dayOfWeek: Int, // 1 = Mon .. 7 = Sun
-    val startTime: String, // "09:00"
-    val endTime: String, // "10:15"
-    val colorHex: String = "#4F46E5",
-    val semester: String = "Current Semester",
+    val dayOfWeek: Int = 1, // 1 = Mon .. 7 = Sun
+    val startPeriod: Int = 1,
+    val endPeriod: Int = 2,
+    val startTime: String = "08:00",
+    val endTime: String = "09:35",
+    val colorHex: String = "#5B9BF3",
+    val semester: String = "Fall 2026",
     val credits: Int = 3,
     val notes: String = ""
 ) {
@@ -50,7 +52,7 @@ data class Course(
                 clean.toLong(16)
             }
         } catch (e: Exception) {
-            0xFF4F46E5
+            0xFF5B9BF3
         }
 
         val semId = semesterIdOverride ?: semester.filter { it.isDigit() }.toLongOrNull() ?: 1L
@@ -63,8 +65,8 @@ data class Course(
             classroom = classroom,
             instructor = instructor,
             dayOfWeek = dayOfWeek,
-            startPeriod = 1,
-            endPeriod = 2,
+            startPeriod = startPeriod,
+            endPeriod = endPeriod,
             startTime = startTime,
             endTime = endTime,
             weekRule = WeekRule.ALL,
@@ -78,7 +80,7 @@ data class Course(
     companion object {
         fun fromEntity(entity: CourseEntity): Course {
             val hexString = String.format("#%06X", (0xFFFFFF and entity.colorHex.toInt()))
-            val semName = if (entity.semesterId == 1L) "Fall 2025" else "Semester ${entity.semesterId}"
+            val semName = if (entity.semesterId == 1L) "Fall 2026" else "Semester ${entity.semesterId}"
             return Course(
                 id = entity.id,
                 name = entity.name,
@@ -86,6 +88,8 @@ data class Course(
                 instructor = entity.instructor,
                 classroom = entity.classroom,
                 dayOfWeek = entity.dayOfWeek,
+                startPeriod = entity.startPeriod,
+                endPeriod = entity.endPeriod,
                 startTime = entity.startTime,
                 endTime = entity.endTime,
                 colorHex = hexString,
@@ -96,4 +100,3 @@ data class Course(
         }
     }
 }
-

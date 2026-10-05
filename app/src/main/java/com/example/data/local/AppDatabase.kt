@@ -9,23 +9,23 @@ import com.example.data.model.*
 
 @Database(
     entities = [
-        SemesterEntity::class,
         Course::class,
+        SemesterEntity::class,
         ExamEntity::class,
         Task::class,
-        HolidayOverrideEntity::class,
+        NotebookEntity::class,
         NoteEntity::class
     ],
-    version = 5,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun semesterDao(): SemesterDao
     abstract fun courseDao(): CourseDao
+    abstract fun semesterDao(): SemesterDao
     abstract fun examDao(): ExamDao
     abstract fun taskDao(): TaskDao
-    abstract fun holidayOverrideDao(): HolidayOverrideDao
+    abstract fun notebookDao(): NotebookDao
     abstract fun noteDao(): NoteDao
 
     companion object {
@@ -34,17 +34,15 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "courses_schedule.db"
+                    "course_schedule_db"
                 )
                 .fallbackToDestructiveMigration()
                 .build()
-                INSTANCE = instance
-                instance
+                .also { INSTANCE = it }
             }
         }
     }
 }
-

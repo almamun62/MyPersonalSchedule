@@ -5,13 +5,15 @@ import java.util.UUID
 data class ImportedCourse(
     val tempId: String = UUID.randomUUID().toString(),
     var name: String,
-    var code: String,
+    var code: String = "",
     var instructor: String = "",
     var classroom: String = "",
-    var dayOfWeek: Int, // 1 = Mon .. 7 = Sun
-    var startTime: String, // HH:mm
-    var endTime: String, // HH:mm
-    var colorHex: String = "#4F46E5",
+    var dayOfWeek: Int = 1, // 1 = Mon .. 7 = Sun
+    var startPeriod: Int = 1,
+    var endPeriod: Int = 2,
+    var startTime: String = "08:00", // HH:mm
+    var endTime: String = "09:35", // HH:mm
+    var colorHex: String = "#5B9BF3",
     var credits: Int = 3,
     var isSelected: Boolean = true,
     var hasConflict: Boolean = false,
@@ -50,6 +52,8 @@ data class ImportedCourse(
         instructor = instructor.trim(),
         classroom = classroom.trim(),
         dayOfWeek = dayOfWeek,
+        startPeriod = startPeriod,
+        endPeriod = endPeriod,
         startTime = startTime.trim(),
         endTime = endTime.trim(),
         colorHex = colorHex,

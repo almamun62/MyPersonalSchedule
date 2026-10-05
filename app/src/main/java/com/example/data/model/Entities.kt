@@ -20,10 +20,6 @@ enum class WeekRule {
     CUSTOM
 }
 
-/**
- * Room Entity representing a university/academic course.
- * Stores course details including name, instructor, time, and location.
- */
 @Entity(tableName = "courses")
 data class Course(
     @PrimaryKey(autoGenerate = true)
@@ -46,7 +42,6 @@ data class Course(
     val dndEnabled: Boolean = true,
     val notes: String = ""
 ) {
-    // Secondary constructor to create a course directly with name, instructor, time, and location
     constructor(
         name: String,
         instructor: String,
@@ -80,9 +75,6 @@ data class ExamEntity(
     val notes: String = ""
 )
 
-/**
- * Room Entity representing an assignment, homework, or task.
- */
 @Entity(tableName = "tasks")
 data class Task(
     @PrimaryKey(autoGenerate = true)
@@ -95,44 +87,14 @@ data class Task(
     val isCompleted: Boolean = false,
     val priority: String = "MEDIUM", // LOW, MEDIUM, HIGH
     val createdAtMillis: Long = System.currentTimeMillis(),
-    val sourceClass: String? = null // For post-class task prompts
-) {
-    constructor(
-        title: String,
-        courseName: String = "",
-        dueDate: String = "",
-        isCompleted: Boolean = false
-    ) : this(
-        id = 0,
-        courseId = 0L,
-        courseName = courseName,
-        title = title,
-        dueDate = dueDate,
-        isCompleted = isCompleted
-    )
-
-    constructor(
-        courseId: Long,
-        title: String,
-        dueDate: String = "",
-        priority: String = "MEDIUM",
-        isCompleted: Boolean = false
-    ) : this(
-        id = 0,
-        courseId = courseId,
-        courseName = "",
-        title = title,
-        dueDate = dueDate,
-        isCompleted = isCompleted,
-        priority = priority
-    )
-}
+    val sourceClass: String? = null
+)
 
 typealias TaskEntity = Task
 
 enum class HolidayOverrideType {
-    HOLIDAY,   // Silences all classes on this date
-    MAKE_UP    // Weekend make-up day (调休): substitutes weekend with a designated weekday's timetable
+    HOLIDAY,
+    MAKE_UP
 }
 
 @Entity(tableName = "holiday_overrides")
@@ -140,23 +102,7 @@ data class HolidayOverrideEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
-    val dateString: String, // YYYY-MM-DD
+    val dateString: String,
     val type: HolidayOverrideType,
-    val targetDayOfWeek: Int? = null // 1 = Monday ... 7 = Sunday (used when type == MAKE_UP)
+    val targetDayOfWeek: Int = 1
 )
-
-enum class NoteType {
-    TEXT, DRAWING, IMAGE, VOICE, FILE
-}
-
-@Entity(tableName = "notes")
-data class NoteEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val courseId: Long,
-    val content: String, // Text content, or URI for image/voice/drawing data
-    val type: NoteType = NoteType.TEXT,
-    val tags: String = "", // Comma-separated tags or category
-    val timestampMillis: Long = System.currentTimeMillis()
-)
-

@@ -1,5 +1,0 @@
-I have successfully implemented the class section timings requested from the SWPU fall calendar:
-- **Default Schedule Configured**: The default start and end times for all 12 periods now reflect the exact timings of the Southwest Petroleum University Fall 2026-2027 calendar (including the 14:30 restart for the afternoon session after lunch, and 19:00 for the evening session).
-- **Manual Section Customization**: I've added a new "Class Section Timings" setting directly inside the Academic Semester Settings card. You can tap "Edit" to bring up a dialog that allows manual adjustments to the start and end times for all 12 periods.
-- **Timetable Sync**: Both the Timetable screen and the schedule importer now rely on these timings, so any custom times you input will instantly update how your class blocks render on the UI.
-- **Academic Term Default Dates**: I verified the default active semester dates automatically align with a 20-week term starting on Aug 31, 2026, which matches the Jan 18 start of the winter break.
