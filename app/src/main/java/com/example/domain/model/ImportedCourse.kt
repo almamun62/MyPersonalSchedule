@@ -15,6 +15,7 @@ data class ImportedCourse(
     var endTime: String = "09:35", // HH:mm
     var colorHex: String = "#5B9BF3",
     var credits: Int = 3,
+    var isRetake: Boolean = false,
     var isSelected: Boolean = true,
     var hasConflict: Boolean = false,
     var conflictDescription: String? = null,
@@ -58,6 +59,7 @@ data class ImportedCourse(
         endTime = endTime.trim(),
         colorHex = colorHex,
         semester = semester,
-        credits = credits
+        credits = credits,
+        isRetake = isRetake
     )
 }

@@ -27,6 +27,21 @@ class UserPreferencesManager(context: Context) {
     private val _isClassReminder15mEnabled = MutableStateFlow(prefs.getBoolean(KEY_CLASS_REMINDER_15M, true))
     val isClassReminder15mEnabled: StateFlow<Boolean> = _isClassReminder15mEnabled.asStateFlow()
 
+    private val _showNotchMode = MutableStateFlow(prefs.getBoolean(KEY_SHOW_NOTCH, true))
+    val showNotchMode: StateFlow<Boolean> = _showNotchMode.asStateFlow()
+
+    private val defaultWidgetsOrder = "HYPER_ISLAND,NEXT_CLASS,TODAY_TIMELINE,TASKS_PREVIEW,SEMESTER_PROGRESS,FOCUS_TIMER,QUICK_ACTIONS"
+
+    private val _dashboardWidgetOrder = MutableStateFlow(loadDashboardWidgetOrder())
+    val dashboardWidgetOrder: StateFlow<List<String>> = _dashboardWidgetOrder.asStateFlow()
+
+    private val _dashboardHiddenWidgets = MutableStateFlow(loadDashboardHiddenWidgets())
+    val dashboardHiddenWidgets: StateFlow<Set<String>> = _dashboardHiddenWidgets.asStateFlow()
+
+    private val defaultAllowedApps = "internal_calculator,internal_notes,internal_materials"
+    private val _focusAllowedApps = MutableStateFlow(loadFocusAllowedApps())
+    val focusAllowedApps: StateFlow<List<String>> = _focusAllowedApps.asStateFlow()
+
     private val _classReminderMinutes = MutableStateFlow(prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15))
     val classReminderMinutes: StateFlow<Int> = _classReminderMinutes.asStateFlow()
 
@@ -96,6 +111,52 @@ class UserPreferencesManager(context: Context) {
         _classReminderMinutes.value = minutes
     }
 
+    fun setShowNotchMode(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_NOTCH, enabled).apply()
+        _showNotchMode.value = enabled
+    }
+
+    fun setDashboardWidgetOrder(order: List<String>) {
+        val str = order.joinToString(",")
+        prefs.edit().putString(KEY_DASHBOARD_ORDER, str).apply()
+        _dashboardWidgetOrder.value = order
+    }
+
+    fun setDashboardHiddenWidgets(hidden: Set<String>) {
+        val str = hidden.joinToString(",")
+        prefs.edit().putString(KEY_DASHBOARD_HIDDEN, str).apply()
+        _dashboardHiddenWidgets.value = hidden
+    }
+
+    fun resetDashboardWidgets() {
+        val defaultList = defaultWidgetsOrder.split(",")
+        prefs.edit().remove(KEY_DASHBOARD_ORDER).remove(KEY_DASHBOARD_HIDDEN).apply()
+        _dashboardWidgetOrder.value = defaultList
+        _dashboardHiddenWidgets.value = emptySet()
+    }
+
+    fun setFocusAllowedApps(apps: List<String>) {
+        val trimmed = apps.take(3)
+        val str = trimmed.joinToString(",")
+        prefs.edit().putString(KEY_FOCUS_ALLOWED_APPS, str).apply()
+        _focusAllowedApps.value = trimmed
+    }
+
+    private fun loadFocusAllowedApps(): List<String> {
+        val raw = prefs.getString(KEY_FOCUS_ALLOWED_APPS, defaultAllowedApps) ?: defaultAllowedApps
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(3)
+    }
+
+    private fun loadDashboardWidgetOrder(): List<String> {
+        val raw = prefs.getString(KEY_DASHBOARD_ORDER, defaultWidgetsOrder) ?: defaultWidgetsOrder
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    private fun loadDashboardHiddenWidgets(): Set<String> {
+        val raw = prefs.getString(KEY_DASHBOARD_HIDDEN, "") ?: ""
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
     private fun loadThemeMode(): AppThemeMode {
         val name = prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name
         return try { AppThemeMode.valueOf(name) } catch (e: Exception) { AppThemeMode.SYSTEM }
@@ -114,8 +175,12 @@ class UserPreferencesManager(context: Context) {
         private const val KEY_AUTO_DND = "pref_auto_dnd"
         private const val KEY_CLASS_REMINDER_15M = "pref_class_reminder_15m"
         private const val KEY_CLASS_REMINDER_MINUTES = "pref_class_reminder_minutes"
+        private const val KEY_SHOW_NOTCH = "pref_show_notch"
         private const val KEY_APP_LANGUAGE = "pref_app_language"
         private const val KEY_SECTION_TIMINGS = "pref_section_timings"
+        private const val KEY_DASHBOARD_ORDER = "pref_dashboard_order"
+        private const val KEY_DASHBOARD_HIDDEN = "pref_dashboard_hidden"
+        private const val KEY_FOCUS_ALLOWED_APPS = "pref_focus_allowed_apps"
 
         val defaultSectionTimings = listOf(
             SectionTiming(1, "08:00", "08:45"),

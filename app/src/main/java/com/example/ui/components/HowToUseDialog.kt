@@ -158,7 +158,7 @@ private fun QuickStartSection() {
         GuideCard(
             stepNumber = "2",
             title = "Import or Add Classes",
-            description = "Go to 'More Options' -> 'Import Schedule' to instantly load your SWPU Fall 2026 courses or import custom CSV files.",
+            description = "Go to 'More Options' -> 'Import Schedule' to instantly load preset courses or import custom CSV and Excel files.",
             icon = Icons.Outlined.CloudUpload,
             badge = "Import Tool",
             color = Color(0xFF10B981)
@@ -167,7 +167,7 @@ private fun QuickStartSection() {
         GuideCard(
             stepNumber = "3",
             title = "Add Home Screen Widget",
-            description = "Long-press your phone's home screen, tap Widgets, and select 'SWPU Class Schedule' to track your next class directly from your home screen!",
+            description = "Long-press your phone's home screen, tap Widgets, and select 'Class Schedule' to track your next class directly from your home screen!",
             icon = Icons.Outlined.Widgets,
             badge = "Glance Widget",
             color = Color(0xFF8B5CF6)

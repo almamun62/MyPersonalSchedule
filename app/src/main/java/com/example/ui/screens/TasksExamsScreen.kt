@@ -70,6 +70,7 @@ fun TasksExamsScreen(viewModel: ScheduleViewModel) {
     }
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Tasks & Exams".tr, fontWeight = FontWeight.Bold) }

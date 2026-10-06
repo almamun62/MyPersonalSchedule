@@ -99,6 +99,24 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    val isShowNotch by viewModel.userPreferencesManager.showNotchMode.collectAsStateWithLifecycle()
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Render Under Notch / Cutout", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Auto-fits UI edge-to-edge under camera cutout area", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = isShowNotch,
+                            onCheckedChange = { viewModel.userPreferencesManager.setShowNotchMode(it) }
+                        )
+                    }
                 }
             }
 
@@ -124,8 +142,9 @@ fun SettingsScreen(
                         }
                         Switch(
                             checked = isAutoDnd,
-                            onCheckedChange = { viewModel.userPreferencesManager.setAutoDndEnabled(it) }
+                            onCheckedChange = { viewModel.toggleAutoDnd() }
                         )
+
                     }
 
                     Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

@@ -5,7 +5,7 @@ object ScheduleTranslationEngine {
         if (text.isBlank()) return ""
         var cleaned = text
 
-        // Normalize common SWPU Course & Location names
+        // Normalize common Course & Location names
         if (cleaned.contains("计算机组成原理")) cleaned = cleaned.replace("计算机组成原理", "Computer Architecture")
         if (cleaned.contains("桌面应用程序设计")) cleaned = cleaned.replace("桌面应用程序设计", "Desktop App Design")
         if (cleaned.contains("数据分析与机器学习")) cleaned = cleaned.replace("数据分析与机器学习", "Data Analysis & ML")

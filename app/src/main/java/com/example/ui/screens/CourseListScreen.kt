@@ -48,6 +48,7 @@ fun CourseListScreen(viewModel: ScheduleViewModel) {
     val uniqueRooms = remember(allCourses) { allCourses.map { it.classroom }.filter { it.isNotBlank() }.distinct().size }
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
                 title = { Text("Course Directory".tr, fontWeight = FontWeight.Bold) }
@@ -210,6 +211,20 @@ fun CourseListScreen(viewModel: ScheduleViewModel) {
                                                 )
                                             }
                                         }
+                                        if (course.isRetake) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFFF59E0B)
+                                            ) {
+                                                Text(
+                                                    text = "🔁 Retake",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.Black,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                     }
 
                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -320,9 +335,14 @@ fun CourseListScreen(viewModel: ScheduleViewModel) {
 
     if (showAddDialog) {
         AddEditCourseDialog(
+            existingCourses = allCourses,
             onDismiss = { showAddDialog = false },
             onSave = {
                 viewModel.addCourse(it)
+                showAddDialog = false
+            },
+            onSaveMultiple = { list ->
+                list.forEach { viewModel.addCourse(it) }
                 showAddDialog = false
             }
         )
@@ -331,6 +351,7 @@ fun CourseListScreen(viewModel: ScheduleViewModel) {
     courseToEdit?.let { course ->
         AddEditCourseDialog(
             initialCourse = course,
+            existingCourses = allCourses,
             onDismiss = { courseToEdit = null },
             onSave = {
                 viewModel.updateCourse(it)
@@ -338,4 +359,5 @@ fun CourseListScreen(viewModel: ScheduleViewModel) {
             }
         )
     }
+
 }

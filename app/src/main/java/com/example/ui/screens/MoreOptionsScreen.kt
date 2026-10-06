@@ -1,10 +1,18 @@
 package com.example.ui.screens
 
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,23 +25,25 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.AcademicCalendarDialog
+import com.example.ui.components.HowToUseDialog
+import com.example.ui.components.NoteTakingCanvasDialog
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.AppThemeMode
 import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ScheduleViewModel
 
-data class MoreOptionItem(
+data class ToolGridItem(
     val title: String,
     val subtitle: String,
     val icon: ImageVector,
-    val badge: String? = null,
     val accentColor: Color,
     val onClick: () -> Unit
 )
@@ -48,7 +58,6 @@ fun MoreOptionsScreen(
     onNavigateToCourses: () -> Unit
 ) {
     val isAutoDnd by viewModel.userPreferencesManager.isAutoDndEnabled.collectAsStateWithLifecycle()
-    val isReminder by viewModel.userPreferencesManager.isClassReminder15mEnabled.collectAsStateWithLifecycle()
     val appLang by viewModel.userPreferencesManager.appLanguage.collectAsStateWithLifecycle()
     val currentThemeMode by viewModel.userPreferencesManager.themeMode.collectAsStateWithLifecycle()
     val currentAccentColor by viewModel.userPreferencesManager.accentColor.collectAsStateWithLifecycle()
@@ -58,219 +67,207 @@ fun MoreOptionsScreen(
     var showFocusModal by remember { mutableStateOf(false) }
     var showCalendarModal by remember { mutableStateOf(false) }
     var showNotesModal by remember { mutableStateOf(false) }
+    var showCalculatorModal by remember { mutableStateOf(false) }
+    var showDndPermissionDialog by remember { mutableStateOf(false) }
 
-    val options = remember(
-        onNavigateToAbout,
+    val context = LocalContext.current
+    val notificationManager = remember {
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
+
+    val notesLabel = "Notes".tr
+    val importLabel = "Import".tr
+    val tasksLabel = "Tasks".tr
+    val settingsLabel = "Settings".tr
+
+    val tools = remember(
         onNavigateToImport,
         onNavigateToTasks,
-        onNavigateToCourses
+        notesLabel,
+        importLabel,
+        tasksLabel,
+        settingsLabel
     ) {
         listOf(
-            MoreOptionItem(
-                title = "Course Notes Archive",
-                subtitle = "Digital Notebooks & Memos",
-                icon = Icons.Outlined.MenuBook,
-                badge = "PDF / Text",
+            ToolGridItem(
+                title = notesLabel,
+                subtitle = "Draw & memos",
+                icon = Icons.Outlined.EditNote,
                 accentColor = Color(0xFF6366F1),
                 onClick = { showNotesModal = true }
             ),
-            MoreOptionItem(
-                title = "Import Schedule",
-                subtitle = "CSV & SWPU Fall 2026 Sync",
+            ToolGridItem(
+                title = "Calculator",
+                subtitle = "Study & Target GPA",
+                icon = Icons.Outlined.Calculate,
+                accentColor = Color(0xFF3B82F6),
+                onClick = { showCalculatorModal = true }
+            ),
+            ToolGridItem(
+                title = importLabel,
+                subtitle = "Schedule files",
                 icon = Icons.Outlined.CloudUpload,
-                badge = "AI Parser",
                 accentColor = Color(0xFF0EA5E9),
                 onClick = onNavigateToImport
             ),
-            MoreOptionItem(
-                title = "Tasks & Exams",
-                subtitle = "Deadlines, Priority & Countdown",
+            ToolGridItem(
+                title = tasksLabel,
+                subtitle = "To-dos & exams",
                 icon = Icons.Outlined.CheckCircleOutline,
-                badge = "Active",
                 accentColor = Color(0xFF10B981),
                 onClick = onNavigateToTasks
             ),
-            MoreOptionItem(
-                title = "Focus & Study Timer",
-                subtitle = "Pomodoro & App Shielding",
+            ToolGridItem(
+                title = "Focus",
+                subtitle = "Study timer",
                 icon = Icons.Outlined.Timer,
-                badge = "25 Min",
                 accentColor = Color(0xFFF59E0B),
                 onClick = { showFocusModal = true }
             ),
-            MoreOptionItem(
-                title = "Academic Calendar",
-                subtitle = "Holidays & Term Milestones",
+            ToolGridItem(
+                title = "Calendar",
+                subtitle = "Academic dates",
                 icon = Icons.Outlined.CalendarMonth,
-                badge = "Fall 2026",
                 accentColor = Color(0xFFEC4899),
                 onClick = { showCalendarModal = true }
             ),
-            MoreOptionItem(
-                title = "Settings & Theme",
-                subtitle = "Colors, DND & Languages",
+            ToolGridItem(
+                title = settingsLabel,
+                subtitle = "Theme & display",
                 icon = Icons.Outlined.Settings,
-                badge = "Custom",
                 accentColor = Color(0xFF8B5CF6),
                 onClick = { showSettingsModal = true }
-            ),
-            MoreOptionItem(
-                title = "About Application",
-                subtitle = "Offline Shield & Build Logs",
-                icon = Icons.Outlined.Info,
-                badge = "v2.4",
-                accentColor = Color(0xFF64748B),
-                onClick = onNavigateToAbout
-            ),
-            MoreOptionItem(
-                title = "User Guide & Tips",
-                subtitle = "Gestures & Quick Setup",
-                icon = Icons.Outlined.HelpOutline,
-                badge = "FAQ",
-                accentColor = Color(0xFF14B8A6),
-                onClick = { showHelpModal = true }
             )
         )
     }
 
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 title = {
                     Column {
-                        Text("More Options".tr, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-                        Text("Academic Control Center • 100% Offline", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "Tools".tr,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "Student Hub",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             )
         }
     ) { innerPadding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Futuristic Hero Banner Card
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = Color.Unspecified,
+            val isTablet = maxWidth >= 600.dp
+            val horizontalPadding = if (isTablet) 24.dp else 16.dp
+
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)
-                            )
-                        ),
-                        shape = RoundedCornerShape(22.dp)
-                    )
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = horizontalPadding, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(22.dp)
-                        )
-                        .padding(18.dp)
+                // 1. Clean Semester Header Card (No scary system jargon)
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            ) {
-                                Text(
-                                    text = "🟢 SYSTEM SHIELD ACTIVE",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                text = "SWPU Fall '26",
-                                fontSize = 11.sp,
+                                text = "Fall 2026 Semester",
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Offline Student Workspace",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
                         }
 
-                        Text(
-                            text = "Smart Student Workspace",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp
-                        )
-
-                        Text(
-                            text = "Manage course archives, system automations, import tools, and focus lock mode directly from one central hub.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 16.sp
-                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Outlined.School,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
                 }
-            }
 
-            // 2. Futuristic 2-Column Grid
-            Text(
-                text = "SYSTEM HUB & UTILITIES",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 1.sp
-            )
+                // 2. Simplified Student Tools Grid
+                Text(
+                    text = "STUDENT TOOLS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.sp
+                )
 
-            // Grid items rendered in rows of 2
-            options.chunked(2).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    rowItems.forEach { item ->
-                        Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(115.dp)
-                                .border(
-                                    width = 1.dp,
-                                    color = item.accentColor.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(18.dp)
-                                )
-                                .clickable { item.onClick() }
-                        ) {
-                            Column(
+                val columns = if (isTablet) 3 else 2
+                val chunkedTools = tools.chunked(columns)
+
+                chunkedTools.forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowItems.forEach { item ->
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                 modifier = Modifier
-                                    .padding(14.dp)
-                                    .fillMaxSize(),
-                                verticalArrangement = Arrangement.SpaceBetween
+                                    .weight(1f)
+                                    .height(100.dp)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .clickable { item.onClick() }
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Top
+                                Column(
+                                    modifier = Modifier
+                                        .padding(12.dp)
+                                        .fillMaxSize(),
+                                    verticalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Box(
                                         modifier = Modifier
                                             .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(item.accentColor.copy(alpha = 0.18f)),
+                                            .background(item.accentColor.copy(alpha = 0.15f)),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
@@ -281,209 +278,247 @@ fun MoreOptionsScreen(
                                         )
                                     }
 
-                                    item.badge?.let { badgeText ->
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = item.accentColor.copy(alpha = 0.2f)
-                                        ) {
-                                            Text(
-                                                text = badgeText,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = item.accentColor,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            text = item.title,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = item.subtitle,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
+                            }
+                        }
 
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // Fill remaining spaces if row is incomplete
+                        if (rowItems.size < columns) {
+                            for (i in 0 until (columns - rowItems.size)) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
+                // 3. Simple Automation: Auto-Silence during Class
+                Text(
+                    text = "PREFERENCES",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        // Friendly Auto-Silence Switch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.VolumeOff,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
                                     Text(
-                                        text = item.title,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        maxLines = 1
+                                        text = "Auto-Silence during Class",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = item.subtitle,
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
+                                        text = if (isAutoDnd) "Mutes notifications while in class" else "Disabled",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+                            Switch(
+                                checked = isAutoDnd,
+                                onCheckedChange = { enable ->
+                                    if (enable) {
+                                        val hasPolicyAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                            notificationManager.isNotificationPolicyAccessGranted
+                                        } else true
+
+                                        if (!hasPolicyAccess) {
+                                            showDndPermissionDialog = true
+                                        } else {
+                                            viewModel.toggleAutoDnd()
+                                        }
+                                    } else {
+                                        viewModel.toggleAutoDnd()
+                                    }
+                                }
+                            )
                         }
-                    }
 
-                    // Fill row if odd items
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-            }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
-            // 3. Futuristic Live Automation & Health Control Widget (Filling space!)
-            Text(
-                text = "AUTOMATION & SYSTEM HEALTH",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    // DND Quick Toggle Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        // Language Selector
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Outlined.DoNotDisturbOn,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            Column {
-                                Text("Auto Do Not Disturb (DND)".tr, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Language,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                                 Text(
-                                    if (isAutoDnd) "Active • Silences phone during lectures" else "Disabled • Tap to enable auto silence",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "Language / 语言",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
-                        }
-                        Switch(
-                            checked = isAutoDnd,
-                            onCheckedChange = { viewModel.userPreferencesManager.setAutoDndEnabled(it) }
-                        )
-                    }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // Language Selector Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Language,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(22.dp)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = appLang == "en",
+                                    onClick = { viewModel.userPreferencesManager.setAppLanguage("en") },
+                                    label = { Text("English", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                )
+                                FilterChip(
+                                    selected = appLang.startsWith("zh"),
+                                    onClick = { viewModel.userPreferencesManager.setAppLanguage("zh") },
+                                    label = { Text("中文", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                                 )
                             }
-                            Column {
-                                Text("Language / 语言", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("App interface language", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = appLang == "en",
-                                onClick = { viewModel.userPreferencesManager.setAppLanguage("en") },
-                                label = { Text("English 🇺🇸", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            )
-                            FilterChip(
-                                selected = appLang.startsWith("zh"),
-                                onClick = { viewModel.userPreferencesManager.setAppLanguage("zh") },
-                                label = { Text("中文 🇨🇳", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // Room DB Storage Metrics Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Outlined.Storage,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            Column {
-                                Text("Local SQLite / Room Engine", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Encrypted local DB • 100% Private", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = "1.2 MB",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                // 4. Subtle About & Help links at the very bottom
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { showHelpModal = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Outlined.HelpOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Guide & Tips", fontSize = 12.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = onNavigateToAbout,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Outlined.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("About App", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
+    }
+
+    // Permission Dialog for DND
+    if (showDndPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showDndPermissionDialog = false },
+            icon = {
+                Icon(
+                    Icons.Outlined.NotificationsOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Do Not Disturb Access", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "To automatically silence calls and alerts during class periods, Android requires Do Not Disturb policy permission.",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDndPermissionDialog = false
+                        viewModel.toggleAutoDnd()
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                ) {
+                    Text("Open Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDndPermissionDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Modal dialogs
     if (showSettingsModal) {
         AlertDialog(
             onDismissRequest = { showSettingsModal = false },
-            title = { Text("Appearance & Theme Settings", fontWeight = FontWeight.Bold) },
+            title = { Text("Appearance & Theme", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Theme Mode", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -521,6 +556,24 @@ fun MoreOptionsScreen(
                             }
                         }
                     }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    val isShowNotch by viewModel.userPreferencesManager.showNotchMode.collectAsStateWithLifecycle()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Full Edge-to-Edge", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text("Render behind device camera cutout", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = isShowNotch,
+                            onCheckedChange = { viewModel.userPreferencesManager.setShowNotchMode(it) }
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -532,52 +585,35 @@ fun MoreOptionsScreen(
     }
 
     if (showFocusModal) {
-        AlertDialog(
-            onDismissRequest = { showFocusModal = false },
-            icon = { Icon(Icons.Outlined.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp)) },
-            title = { Text("Study Focus Lock", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Launch a 25-minute Pomodoro study session. The app will mute notifications and activate class shield focus mode.")
-            },
-            confirmButton = {
-                Button(onClick = { showFocusModal = false }) {
-                    Text("Start 25m Focus")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showFocusModal = false }) {
-                    Text("Cancel")
-                }
-            }
+        com.example.ui.components.StudyFocusDialog(
+            viewModel = viewModel,
+            onDismiss = { showFocusModal = false }
         )
     }
 
     if (showNotesModal) {
-        AlertDialog(
-            onDismissRequest = { showNotesModal = false },
-            icon = { Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp)) },
-            title = { Text("Course Notes Archive", fontWeight = FontWeight.Bold) },
-            text = {
-                Text("You have 4 lecture notebooks saved locally in Room SQLite database. Access notes directly from any course item on the Timetable screen.")
-            },
-            confirmButton = {
-                TextButton(onClick = { showNotesModal = false }) {
-                    Text("OK")
-                }
-            }
+        NoteTakingCanvasDialog(
+            viewModel = viewModel,
+            onDismiss = { showNotesModal = false }
+        )
+    }
+
+    if (showCalculatorModal) {
+        com.example.ui.components.OfflineCalculatorDialog(
+            viewModel = viewModel,
+            onDismiss = { showCalculatorModal = false }
         )
     }
 
     if (showCalendarModal) {
-        com.example.ui.components.AcademicCalendarDialog(
+        AcademicCalendarDialog(
             viewModel = viewModel,
             onDismiss = { showCalendarModal = false }
         )
     }
 
-
     if (showHelpModal) {
-        com.example.ui.components.HowToUseDialog(
+        HowToUseDialog(
             onDismiss = { showHelpModal = false }
         )
     }

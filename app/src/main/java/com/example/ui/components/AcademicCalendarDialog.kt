@@ -656,7 +656,7 @@ fun EmptyCalendarState(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Store your official SWPU Academic Calendar photos, PDFs, Word docs, or Excel sheets for 100% offline access anytime.",
+            text = "Store your official Academic Calendar photos, PDFs, Word docs, or Excel sheets for 100% offline access anytime.",
             style = MaterialTheme.typography.bodyMedium.copy(
                 color = Color(0xFF94A3B8),
                 textAlign = TextAlign.Center,
@@ -884,10 +884,10 @@ fun createSampleCalendarFile(
         val calDir = File(context.filesDir, "academic_calendars")
         if (!calDir.exists()) calDir.mkdirs()
 
-        val sampleFile = File(calDir, "SWPU_Academic_Calendar_Fall_2026.pdf")
+        val sampleFile = File(calDir, "University_Academic_Calendar_Fall_2026.pdf")
         if (!sampleFile.exists()) {
             sampleFile.writeText(
-                "SOUTHWEST PETROLEUM UNIVERSITY (SWPU)\nACADEMIC CALENDAR FALL 2026\n\n" +
+                "UNIVERSITY ACADEMIC CALENDAR FALL 2026\n\n" +
                         "1. Term Duration: September 7, 2026 – January 15, 2027 (16 Weeks)\n" +
                         "2. Midterm Examinations: Week 8 (October 26 – October 30)\n" +
                         "3. National Day Recess: October 1 – October 7\n" +
@@ -897,17 +897,17 @@ fun createSampleCalendarFile(
         }
 
         val entity = AcademicCalendarFileEntity(
-            fileName = "SWPU_Academic_Calendar_Fall_2026.pdf",
+            fileName = "University_Academic_Calendar_Fall_2026.pdf",
             fileType = "PDF",
             mimeType = "application/pdf",
             localPath = sampleFile.absolutePath,
             fileSizeBytes = sampleFile.length(),
             addedAtMillis = System.currentTimeMillis(),
-            note = "Official SWPU Fall 2026 Schedule & Exam Dates"
+            note = "Official Fall 2026 Schedule & Exam Dates"
         )
 
         viewModel.addCalendarFile(entity)
-        Toast.makeText(context, "Sample SWPU Calendar file saved!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Sample Calendar file saved!", Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         e.printStackTrace()
     }

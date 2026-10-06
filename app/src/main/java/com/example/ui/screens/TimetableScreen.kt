@@ -3,7 +3,6 @@ package com.example.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +29,7 @@ import com.example.ui.components.QuickModifyClassDialog
 import com.example.ui.components.SectionTimingsDialog
 import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ScheduleViewModel
+import com.example.ui.viewmodel.ScheduleViewMode
 
 private fun parseTimeToMinutes(timeStr: String): Int {
     val clean = timeStr.trim()
@@ -80,11 +80,11 @@ fun TimetableScreen(
     onNavigateToCourses: (() -> Unit)? = null,
     onOpenAcademicCalendar: (() -> Unit)? = null
 ) {
-
     val selectedDay by viewModel.selectedDay.collectAsStateWithLifecycle()
     val selectedWeek by viewModel.selectedWeek.collectAsStateWithLifecycle()
     val allCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
     val timings by viewModel.userPreferencesManager.sectionTimings.collectAsStateWithLifecycle()
+    val scheduleViewMode by viewModel.scheduleViewMode.collectAsStateWithLifecycle()
 
     var showAddCourseDialog by remember { mutableStateOf(false) }
     var showSectionTimingsDialog by remember { mutableStateOf(false) }
@@ -97,566 +97,528 @@ fun TimetableScreen(
     }
 
     val dayNamesShort = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    val dayDates = listOf("28", "29", "30", "1", "2", "3", "4") // Sample academic week dates as in screenshot
+    val dayDates = listOf("28", "29", "30", "1", "2", "3", "4")
     val selectedDayName = dayNamesShort.getOrNull(selectedDay - 1) ?: "Sun"
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isTablet = maxWidth >= 600.dp
+        val isWeekGrid = scheduleViewMode == ScheduleViewMode.WEEK_GRID || (isTablet && scheduleViewMode != ScheduleViewMode.DAY)
 
-                title = {
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { weekDropdownExpanded = true }
-                        ) {
-                            Text(
-                                text = "Week $selectedWeek, $selectedDayName",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = "Select Week",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Text(
-                            text = "10/4/26",
-                            fontSize = 12.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-
-                        DropdownMenu(
-                            expanded = weekDropdownExpanded,
-                            onDismissRequest = { weekDropdownExpanded = false }
-                        ) {
-                            for (w in 1..20) {
-                                DropdownMenuItem(
-                                    text = { Text("Week $w") },
-                                    onClick = {
-                                        viewModel.setSelectedWeek(w)
-                                        weekDropdownExpanded = false
-                                    }
+        Scaffold(
+            modifier = Modifier.statusBarsPadding(),
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    title = {
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { weekDropdownExpanded = true }
+                            ) {
+                                Text(
+                                    text = if (isWeekGrid) "Week $selectedWeek" else "Week $selectedWeek, $selectedDayName",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = "Select Week",
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
+                            Text(
+                                text = "Fall 2026",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            DropdownMenu(
+                                expanded = weekDropdownExpanded,
+                                onDismissRequest = { weekDropdownExpanded = false }
+                            ) {
+                                for (w in 1..20) {
+                                    DropdownMenuItem(
+                                        text = { Text("Week $w") },
+                                        onClick = {
+                                            viewModel.setSelectedWeek(w)
+                                            weekDropdownExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { onOpenAcademicCalendar?.invoke() }) {
+                            Icon(Icons.Outlined.CalendarMonth, contentDescription = "Academic Calendar", tint = MaterialTheme.colorScheme.primary)
+                        }
+                        IconButton(onClick = onNavigateToImport) {
+                            Icon(Icons.Outlined.FileDownload, contentDescription = "Import", tint = MaterialTheme.colorScheme.onBackground)
+                        }
+                        IconButton(onClick = { showSectionTimingsDialog = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onBackground)
                         }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { /* Search */ }) {
-                        Icon(Icons.Outlined.Search, contentDescription = "Search", tint = Color.White)
-                    }
-                    IconButton(onClick = {
-                        initialAddPeriod = 1
-                        showAddCourseDialog = true
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add", tint = Color.White)
-                    }
-                    IconButton(onClick = { onOpenAcademicCalendar?.invoke() }) {
-                        Icon(Icons.Outlined.CalendarMonth, contentDescription = "Academic Calendar", tint = Color(0xFFA8C7FA))
-                    }
-                    IconButton(onClick = onNavigateToImport) {
-                        Icon(Icons.Outlined.FileDownload, contentDescription = "Import", tint = Color.White)
-                    }
-
-                    IconButton(onClick = { /* Share */ }) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share", tint = Color.White)
-                    }
-                    IconButton(onClick = { showSectionTimingsDialog = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF243348),
-                    onClick = onNavigateToImport,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.FileUpload, contentDescription = "Import", tint = Color.White, modifier = Modifier.size(22.dp))
-                    }
-                }
-
-                Button(
+                )
+            },
+            floatingActionButton = {
+                FloatingActionButton(
                     onClick = {
                         initialAddPeriod = 1
                         showAddCourseDialog = true
                     },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Course", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                }
-
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Top Date Strip (Exact match to Screenshot 2)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Leftmost "Oct" icon card (Clickable to open Academic Calendar Vault)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF182230),
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(64.dp)
-                        .clickable { onOpenAcademicCalendar?.invoke() }
-                ) {
-
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Oct", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8EADC9))
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Add Course".tr, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                // ==========================================
+                // SIMPLE VIEW-TYPE TOGGLE (Day vs. Week)
+                // ==========================================
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = if (isTablet) 24.dp else 16.dp, vertical = 6.dp)
+                ) {
+                    SegmentedButton(
+                        selected = !isWeekGrid,
+                        onClick = { viewModel.setScheduleViewMode(ScheduleViewMode.DAY) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.CalendarToday, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Day View", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
+                    }
+                    SegmentedButton(
+                        selected = isWeekGrid,
+                        onClick = { viewModel.setScheduleViewMode(ScheduleViewMode.WEEK_GRID) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.GridView, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Week View", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                        }
                     }
                 }
 
-                // 7 Day Cards (Mon 28 .. Sun 4)
-                for (d in 1..7) {
-                    val isSelected = d == selectedDay
-                    val dayName = dayNamesShort[d - 1]
-                    val dateNum = dayDates[d - 1]
-                    val hasCourses = allCourses.any { it.dayOfWeek == d }
-
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = if (isSelected) Color(0xFFA8C7FA) else Color(0xFF182230),
+                if (isWeekGrid) {
+                    // ==========================================
+                    // WEEK GRID VIEW (Mon - Sun side-by-side)
+                    // ==========================================
+                    Column(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(64.dp)
-                            .clickable { viewModel.setSelectedDay(d) }
+                            .fillMaxSize()
+                            .padding(horizontal = if (isTablet) 16.dp else 8.dp, vertical = 4.dp)
                     ) {
+                        // Week Day Column Headers
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Time",
+                                modifier = Modifier.width(36.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            dayNamesShort.forEachIndexed { idx, dayName ->
+                                val dayNum = idx + 1
+                                val isToday = dayNum == selectedDay
+                                Text(
+                                    text = dayName,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Bold,
+                                    color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 12 Periods Row Grid
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(vertical = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.SpaceBetween
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = dayName,
-                                fontSize = 11.sp,
-                                color = if (isSelected) Color(0xFF0F1E33) else Color(0xFF94A3B8),
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
+                            for (p in 1..12) {
+                                val timing = timings.getOrNull(p - 1)
+                                val sTime = timing?.startTime ?: "08:00"
 
-                            Text(
-                                text = dateNum,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color(0xFF0F1E33) else Color.White
-                            )
-
-                            // Dot below
-                            Box(
-                                modifier = Modifier
-                                    .size(4.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        when {
-                                            isSelected -> Color(0xFF0F1E33)
-                                            hasCourses -> Color(0xFFA8C7FA)
-                                            else -> Color.Transparent
-                                        }
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Timetable Periods Grid (Exact match to Screenshot 2)
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-            ) {
-                // Left Column: Periods & Intermission Badges
-                Column(modifier = Modifier.width(56.dp)) {
-                    for (period in 1..12) {
-                        val timing = timings.getOrNull(period - 1)
-                        val sTime = timing?.startTime ?: "08:00"
-                        val eTime = timing?.endTime ?: "08:45"
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("$period", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
-                                Text(sTime, fontSize = 9.sp, color = Color(0xFF94A3B8))
-                                Text(eTime, fontSize = 9.sp, color = Color(0xFF94A3B8))
-                            }
-                        }
-
-                        // Intermission pills after periods 2, 5, 7
-                        if (period == 2) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(30.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF2C1E38)
-                                ) {
-                                    Text("15m", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE4C7FA), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                            }
-                        } else if (period == 5) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(30.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF2C1E38)
-                                ) {
-                                    Text("135m", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE4C7FA), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                            }
-                        } else if (period == 7) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(30.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF2C1E38)
-                                ) {
-                                    Text("15m", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE4C7FA), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Right Column: Course Cards, Empty Slots, and Break Bars
-                Column(modifier = Modifier.weight(1f)) {
-                    var currPeriod = 1
-                    while (currPeriod <= 12) {
-                        val startingCourses = dayCourses.filter { it.getStartPeriod(timings) == currPeriod }
-
-                        if (startingCourses.isNotEmpty()) {
-                            var maxEndP = currPeriod
-                            startingCourses.forEach { course ->
-                                val startP = course.getStartPeriod(timings)
-                                val endP = course.getEndPeriod(timings).coerceAtLeast(startP)
-                                maxEndP = maxOf(maxEndP, endP)
-                                val span = (endP - startP + 1).coerceAtLeast(1)
-                                val cardHeight = (64 * span).dp
-
-                                val cardColor = try {
-                                    Color(android.graphics.Color.parseColor(course.colorHex))
-                                } catch (e: Exception) {
-                                    Color(0xFF2563EB)
-                                }
-
-                                Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = cardColor),
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(cardHeight)
-                                        .padding(vertical = 2.dp)
-                                        .clickable { courseToQuickEdit = course }
+                                        .height(if (isTablet) 60.dp else 48.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(
-                                                text = course.name,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                fontSize = 14.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (course.classroom.isNotBlank()) {
+                                    // Clean time marker on the left
+                                    Text(
+                                        text = sTime,
+                                        modifier = Modifier.width(36.dp),
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    for (d in 1..7) {
+                                        val courseInSlot = allCourses.find {
+                                            it.dayOfWeek == d && p in it.getStartPeriod(timings)..it.getEndPeriod(timings)
+                                        }
+
+                                        // Subtle empty cell or course block (NO period labels in empty slots)
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .padding(horizontal = 1.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(
+                                                    if (courseInSlot != null) {
+                                                        try {
+                                                            Color(android.graphics.Color.parseColor(courseInSlot.colorHex))
+                                                        } catch (e: Exception) {
+                                                            MaterialTheme.colorScheme.primary
+                                                        }
+                                                    } else {
+                                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+                                                    }
+                                                )
+                                                .clickable {
+                                                    if (courseInSlot != null) {
+                                                        courseToQuickEdit = courseInSlot
+                                                    } else {
+                                                        viewModel.setSelectedDay(d)
+                                                        initialAddPeriod = p
+                                                        showAddCourseDialog = true
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (courseInSlot != null) {
                                                 Text(
-                                                    text = "📍 ${course.classroom}",
-                                                    color = Color.White.copy(alpha = 0.9f),
-                                                    fontSize = 11.sp
+                                                    text = courseInSlot.name,
+                                                    fontSize = if (isTablet) 11.sp else 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    textAlign = TextAlign.Center,
+                                                    lineHeight = 11.sp,
+                                                    modifier = Modifier.padding(2.dp)
                                                 )
                                             }
                                         }
-
-                                        Text(
-                                            text = "Periods $startP-$endP (${course.startTime}-${course.endTime})",
-                                            color = Color.White.copy(alpha = 0.8f),
-                                            fontSize = 10.sp
-                                        )
                                     }
                                 }
                             }
 
-                            // Render intermission bars if passed period 2, 5, 7
-                            if (maxEndP == 2) {
-                                Surface(
-                                    color = Color(0xFF2C1E38),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                    shape = RoundedCornerShape(8.dp),
+                            // Clearance so FAB never covers the last class
+                            Spacer(modifier = Modifier.height(88.dp))
+                        }
+                    }
+                } else {
+                    // ==========================================
+                    // DAY VIEW (Clean timeline, subtle indicators)
+                    // ==========================================
+
+                    // Compact Date Selector Strip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (d in 1..7) {
+                            val isSelected = d == selectedDay
+                            val dayName = dayNamesShort[d - 1]
+                            val dateNum = dayDates[d - 1]
+                            val hasCourses = allCourses.any { it.dayOfWeek == d }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                                    .clickable { viewModel.setSelectedDay(d) }
+                            ) {
+                                Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(28.dp)
-                                        .padding(vertical = 1.dp)
+                                        .fillMaxSize()
+                                        .padding(vertical = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                            Text("Break Time • 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
-                                        }
-                                        Text("09:35 - 09:50", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
-                                    }
-                                }
-                            } else if (maxEndP == 5) {
-                                Surface(
-                                    color = Color(0xFF2C1E38),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(28.dp)
-                                        .padding(vertical = 1.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                            Text("Lunch Break • 2h 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
-                                        }
-                                        Text("12:15 - 14:30", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
-                                    }
-                                }
-                            } else if (maxEndP == 7) {
-                                Surface(
-                                    color = Color(0xFF2C1E38),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(28.dp)
-                                        .padding(vertical = 1.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                            Text("Break Time • 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
-                                        }
-                                        Text("16:05 - 16:20", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
-                                    }
+                                    Text(
+                                        text = dayName,
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+
+                                    Text(
+                                        text = dateNum,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(4.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                when {
+                                                    isSelected -> MaterialTheme.colorScheme.primary
+                                                    hasCourses -> MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                                    else -> Color.Transparent
+                                                }
+                                            )
+                                    )
                                 }
                             }
+                        }
+                    }
 
-                            currPeriod = maxEndP + 1
-                        } else {
-                            val emptyP = currPeriod
-                            val isCovered = dayCourses.any {
-                                val sP = it.getStartPeriod(timings)
-                                val eP = it.getEndPeriod(timings)
-                                sP <= emptyP && eP >= emptyP
-                            }
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                            if (!isCovered) {
+                    // Day Timeline (Clean time on left, subtle empty indicators on right)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        // Left Column: Times
+                        Column(modifier = Modifier.width(46.dp)) {
+                            for (period in 1..12) {
+                                val timing = timings.getOrNull(period - 1)
+                                val sTime = timing?.startTime ?: "08:00"
+
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(64.dp)
-                                        .padding(vertical = 2.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color(0xFF131B26))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color(0xFF1D2838),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable {
-                                            initialAddPeriod = emptyP
-                                            showAddCourseDialog = true
-                                        },
-                                    contentAlignment = Alignment.Center
+                                        .height(58.dp),
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
                                     Text(
-                                        text = "+ Period $emptyP",
-                                        fontSize = 11.5.sp,
-                                        color = Color(0xFF6B7280),
-                                        fontWeight = FontWeight.Normal
+                                        text = sTime,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+                            }
+                        }
 
-                                if (emptyP == 2) {
-                                    Surface(
-                                        color = Color(0xFF2C1E38),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(28.dp)
-                                            .padding(vertical = 1.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Right Column: Course Cards & Subtle Empty Slots
+                        Column(modifier = Modifier.weight(1f)) {
+                            var currPeriod = 1
+                            while (currPeriod <= 12) {
+                                val startingCourses = dayCourses.filter { it.getStartPeriod(timings) == currPeriod }
+
+                                if (startingCourses.isNotEmpty()) {
+                                    var maxEndP = currPeriod
+                                    startingCourses.forEach { course ->
+                                        val startP = course.getStartPeriod(timings)
+                                        val endP = course.getEndPeriod(timings).coerceAtLeast(startP)
+                                        maxEndP = maxOf(maxEndP, endP)
+                                        val span = (endP - startP + 1).coerceAtLeast(1)
+                                        val cardHeight = (58 * span).dp
+
+                                        val cardColor = try {
+                                            Color(android.graphics.Color.parseColor(course.colorHex))
+                                        } catch (e: Exception) {
+                                            MaterialTheme.colorScheme.primary
+                                        }
+
+                                        Card(
+                                            shape = RoundedCornerShape(14.dp),
+                                            colors = CardDefaults.cardColors(containerColor = cardColor),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(cardHeight)
+                                                .padding(vertical = 2.dp)
+                                                .clickable { courseToQuickEdit = course }
                                         ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                                Text("Break Time • 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
+                                            Column(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text(
+                                                            text = course.name,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color.White,
+                                                            fontSize = 14.sp,
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.weight(1f, fill = false)
+                                                        )
+                                                        if (course.isRetake) {
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = Color(0xFFF59E0B)
+                                                            ) {
+                                                                Text(
+                                                                    text = "Retake",
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.ExtraBold,
+                                                                    color = Color.Black,
+                                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                    if (course.classroom.isNotBlank()) {
+                                                        Text(
+                                                            text = "📍 ${course.classroom}",
+                                                            color = Color.White.copy(alpha = 0.9f),
+                                                            fontSize = 11.sp
+                                                        )
+                                                    }
+                                                }
+
+                                                Text(
+                                                    text = "${course.startTime} - ${course.endTime}",
+                                                    color = Color.White.copy(alpha = 0.8f),
+                                                    fontSize = 10.sp
+                                                )
                                             }
-                                            Text("09:35 - 09:50", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
                                         }
                                     }
-                                } else if (emptyP == 5) {
+
+                                    currPeriod = maxEndP + 1
+                                } else {
+                                    val targetP = currPeriod
+
+                                    // Subtle indicator for empty time slot:
+                                    // NO period labels ("+ Period X" removed completely)
+                                    // Only a quiet, clean surface with a subtle faint indicator line
                                     Surface(
-                                        color = Color(0xFF2C1E38),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            width = 0.5.dp,
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                        ),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(28.dp)
-                                            .padding(vertical = 1.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                                Text("Lunch Break • 2h 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
+                                            .height(54.dp)
+                                            .padding(vertical = 2.dp)
+                                            .clickable {
+                                                initialAddPeriod = targetP
+                                                showAddCourseDialog = true
                                             }
-                                            Text("12:15 - 14:30", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            // Subtle indicator line / quiet plus sign
+                                            Icon(
+                                                Icons.Default.Add,
+                                                contentDescription = "Add class",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(14.dp)
+                                            )
                                         }
                                     }
-                                } else if (emptyP == 7) {
-                                    Surface(
-                                        color = Color(0xFF2C1E38),
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3F2652)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(28.dp)
-                                            .padding(vertical = 1.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Icon(Icons.Default.Coffee, contentDescription = null, tint = Color(0xFFE4C7FA), modifier = Modifier.size(14.dp))
-                                                Text("Break Time • 15m", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE4C7FA))
-                                            }
-                                            Text("16:05 - 16:20", fontSize = 10.sp, color = Color(0xFFE4C7FA).copy(alpha = 0.8f))
-                                        }
-                                    }
+
+                                    currPeriod++
                                 }
                             }
 
-                            currPeriod++
+                            // Clearance so FAB never covers the last class
+                            Spacer(modifier = Modifier.height(88.dp))
                         }
                     }
                 }
             }
         }
-    }
 
-    if (showAddCourseDialog) {
-        AddEditCourseDialog(
-            initialDay = selectedDay,
-            initialStartPeriod = initialAddPeriod,
-            onDismiss = { showAddCourseDialog = false },
-            onSave = { course ->
-                viewModel.addCourse(course)
-                showAddCourseDialog = false
-            }
-        )
-    }
+        if (showAddCourseDialog) {
+            AddEditCourseDialog(
+                initialCourse = null,
+                existingCourses = allCourses,
+                defaultSemester = "Fall 2026",
+                initialDay = selectedDay,
+                initialStartPeriod = initialAddPeriod,
+                onDismiss = { showAddCourseDialog = false },
+                onSave = { newCourse ->
+                    viewModel.addCourse(newCourse)
+                    showAddCourseDialog = false
+                },
+                onSaveMultiple = { newCourses ->
+                    newCourses.forEach { viewModel.addCourse(it) }
+                    showAddCourseDialog = false
+                }
+            )
+        }
 
-    if (showSectionTimingsDialog) {
-        SectionTimingsDialog(
-            currentTimings = timings,
-            onDismiss = { showSectionTimingsDialog = false },
-            onSave = { updated ->
-                viewModel.userPreferencesManager.setSectionTimings(updated)
-                showSectionTimingsDialog = false
-            }
-        )
-    }
+        if (showSectionTimingsDialog) {
+            SectionTimingsDialog(
+                currentTimings = timings,
+                onDismiss = { showSectionTimingsDialog = false },
+                onSave = { updated ->
+                    viewModel.userPreferencesManager.setSectionTimings(updated)
+                    showSectionTimingsDialog = false
+                }
+            )
+        }
 
-    courseToQuickEdit?.let { course ->
-        QuickModifyClassDialog(
-            course = course.toEntity(),
-            onDismiss = { courseToQuickEdit = null },
-            onSave = { newRoom, sP, eP, sT, eT, _ ->
-                val updated = course.copy(
-                    classroom = newRoom,
-                    startPeriod = sP,
-                    endPeriod = eP,
-                    startTime = sT,
-                    endTime = eT
-                )
-                viewModel.updateCourse(updated)
-                courseToQuickEdit = null
-            }
-        )
+        courseToQuickEdit?.let { course ->
+            QuickModifyClassDialog(
+                course = course.toEntity(),
+                onDismiss = { courseToQuickEdit = null },
+                onSave = { newClassroom, newStartP, newEndP, newStartT, newEndT, _ ->
+                    val updated = course.copy(
+                        classroom = newClassroom,
+                        startPeriod = newStartP,
+                        endPeriod = newEndP,
+                        startTime = newStartT,
+                        endTime = newEndT
+                    )
+                    viewModel.updateCourse(updated)
+                    courseToQuickEdit = null
+                }
+            )
+        }
     }
 }

@@ -19,6 +19,9 @@ interface NotebookDao {
 
 @Dao
 interface NoteDao {
+    @Query("SELECT * FROM notes ORDER BY updatedAtMillis DESC")
+    fun getAllNotes(): Flow<List<NoteEntity>>
+
     @Query("SELECT * FROM notes WHERE notebookId = :notebookId ORDER BY updatedAtMillis DESC")
     fun getNotesByNotebook(notebookId: Long): Flow<List<NoteEntity>>
 

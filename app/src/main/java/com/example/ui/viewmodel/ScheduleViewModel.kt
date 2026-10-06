@@ -37,6 +37,21 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     val allCalendarFiles: StateFlow<List<AcademicCalendarFileEntity>> = repository.getAllCalendarFiles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allNotes: StateFlow<List<com.example.data.model.NoteEntity>> = repository.getAllNotes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allCourseMaterials: StateFlow<List<com.example.data.model.CourseMaterialEntity>> = repository.getAllCourseMaterials()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _scheduleViewMode = MutableStateFlow(ScheduleViewMode.DAY)
+    val scheduleViewMode: StateFlow<ScheduleViewMode> = _scheduleViewMode.asStateFlow()
+
+    private val _targetedWeekStart = MutableStateFlow(1)
+    val targetedWeekStart: StateFlow<Int> = _targetedWeekStart.asStateFlow()
+
+    private val _targetedWeekEnd = MutableStateFlow(16)
+    val targetedWeekEnd: StateFlow<Int> = _targetedWeekEnd.asStateFlow()
+
 
     private val _selectedDay = MutableStateFlow(LocalDate.now().dayOfWeek.value)
     val selectedDay: StateFlow<Int> = _selectedDay.asStateFlow()
@@ -61,7 +76,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val list = allCourses.first()
             if (list.isEmpty()) {
-                loadMamunPresetSchedule()
+                loadComputerSciencePreset()
             }
             val exams = allExams.first()
             if (exams.isEmpty()) {
@@ -90,23 +105,41 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         userPreferencesManager.setClassReminder15mEnabled(!userPreferencesManager.isClassReminder15mEnabled.value)
     }
 
+    fun toggleAutoDnd() {
+        val next = !userPreferencesManager.isAutoDndEnabled.value
+        userPreferencesManager.setAutoDndEnabled(next)
+        viewModelScope.launch {
+            com.example.service.DndAutomationScheduler.scheduleAllDndAlarms(getApplication())
+        }
+    }
+
+    fun rescheduleDndAlarms() {
+        viewModelScope.launch {
+            com.example.service.DndAutomationScheduler.scheduleAllDndAlarms(getApplication())
+        }
+    }
+
     fun addCourse(course: com.example.domain.model.Course) {
         viewModelScope.launch {
             repository.insertCourse(course.toEntity())
+            rescheduleDndAlarms()
         }
     }
 
     fun updateCourse(course: com.example.domain.model.Course) {
         viewModelScope.launch {
             repository.updateCourse(course.toEntity())
+            rescheduleDndAlarms()
         }
     }
 
     fun deleteCourse(course: com.example.domain.model.Course) {
         viewModelScope.launch {
             repository.deleteCourse(course.toEntity())
+            rescheduleDndAlarms()
         }
     }
+
 
     fun addTask(title: String, courseName: String = "", priority: String = "MEDIUM") {
         viewModelScope.launch {
@@ -153,10 +186,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun loadMamunPresetSchedule() {
+    fun loadComputerSciencePreset() {
         viewModelScope.launch {
             repository.deleteAllCourses()
-            val imported = ScheduleParser.getMamunFall2026ImportedCourses()
+            val imported = ScheduleParser.getComputerSciencePreset()
             val entities = imported.map { it.toCourse("Fall 2026").toEntity() }
             repository.insertCourses(entities)
         }
@@ -214,5 +247,87 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             repository.deleteCalendarFile(file)
         }
     }
+
+    fun syncScheduleToSystemCalendar(context: android.content.Context): Int {
+        var count = 0
+        try {
+            val courses = filteredCourses.value
+            val contentResolver = context.contentResolver
+            val calId = 1L // Primary calendar
+
+            courses.forEach { course ->
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.CalendarContract.Events.DTSTART, System.currentTimeMillis() + 3600000L)
+                    put(android.provider.CalendarContract.Events.DTEND, System.currentTimeMillis() + 7200000L)
+                    put(android.provider.CalendarContract.Events.TITLE, "${course.name} (${course.code})")
+                    put(android.provider.CalendarContract.Events.DESCRIPTION, "Instructor: ${course.instructor} • Room: ${course.classroom}")
+                    put(android.provider.CalendarContract.Events.EVENT_LOCATION, course.classroom)
+                    put(android.provider.CalendarContract.Events.CALENDAR_ID, calId)
+                    put(android.provider.CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().id)
+                    val byDay = when (course.dayOfWeek) {
+                        1 -> "MO"; 2 -> "TU"; 3 -> "WE"; 4 -> "TH"; 5 -> "FR"; 6 -> "SA"; else -> "SU"
+                    }
+                    put(android.provider.CalendarContract.Events.RRULE, "FREQ=WEEKLY;BYDAY=$byDay")
+                }
+                val uri = contentResolver.insert(android.provider.CalendarContract.Events.CONTENT_URI, values)
+                if (uri != null) count++
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return count
+    }
+
+    fun setScheduleViewMode(mode: ScheduleViewMode) {
+        _scheduleViewMode.value = mode
+    }
+
+    fun setTargetedRange(start: Int, end: Int) {
+        _targetedWeekStart.value = start
+        _targetedWeekEnd.value = end
+    }
+
+    fun insertNote(title: String, content: String, courseId: Long = 0, drawingJson: String? = null) {
+        viewModelScope.launch {
+            repository.insertNote(
+                com.example.data.model.NoteEntity(
+                    title = title,
+                    content = content,
+                    courseId = courseId,
+                    drawingDataJson = drawingJson,
+                    createdAtMillis = System.currentTimeMillis(),
+                    updatedAtMillis = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun deleteNote(note: com.example.data.model.NoteEntity) {
+        viewModelScope.launch {
+            repository.deleteNote(note)
+        }
+    }
+
+    fun insertCourseMaterial(material: com.example.data.model.CourseMaterialEntity) {
+        viewModelScope.launch {
+            repository.insertCourseMaterial(material)
+        }
+    }
+
+    fun deleteCourseMaterial(material: com.example.data.model.CourseMaterialEntity) {
+        viewModelScope.launch {
+            repository.deleteCourseMaterial(material)
+        }
+    }
+
+    fun generateShareCode(): String {
+        return com.example.domain.parser.ShareCodeManager.generateShareCode(filteredCourses.value)
+    }
+}
+
+enum class ScheduleViewMode {
+    DAY,
+    WEEK_GRID,
+    TARGETED_RANGE
 }
 

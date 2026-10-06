@@ -5,7 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -18,10 +21,15 @@ import com.example.ui.theme.LocalAppLanguage
 import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ImportViewModel
 import com.example.ui.viewmodel.ScheduleViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         enableEdgeToEdge()
         setContent {
             val scheduleViewModel: ScheduleViewModel = viewModel()
@@ -61,88 +69,127 @@ fun MainAppScaffold(
     scheduleViewModel: ScheduleViewModel,
     importViewModel: ImportViewModel
 ) {
-    var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    val mainTabs = remember { listOf(Screen.TIMETABLE, Screen.DASHBOARD, Screen.TASKS, Screen.COURSES, Screen.MORE) }
+    val pagerState = rememberPagerState(initialPage = 1) { mainTabs.size }
+    val coroutineScope = rememberCoroutineScope()
+    var activeSecondaryScreen by remember { mutableStateOf<Screen?>(null) }
     var showAcademicCalendarModal by remember { mutableStateOf(false) }
 
-    if (currentScreen != Screen.DASHBOARD) {
+    // Back handler management
+    if (activeSecondaryScreen != null) {
         BackHandler {
-            currentScreen = Screen.DASHBOARD
+            activeSecondaryScreen = null
+        }
+    } else if (pagerState.currentPage != 1) { // Default tab is Dashboard (index 1)
+        BackHandler {
+            coroutineScope.launch {
+                pagerState.animateScrollToPage(1)
+            }
         }
     }
 
+    val showNotchMode by scheduleViewModel.userPreferencesManager.showNotchMode.collectAsState()
+
     Scaffold(
+        contentWindowInsets = if (showNotchMode) WindowInsets(0, 0, 0, 0) else WindowInsets.systemBars,
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(
-                    selected = currentScreen == Screen.TIMETABLE,
-                    onClick = { currentScreen = Screen.TIMETABLE },
-                    icon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
-                    label = { Text("Timetable".tr) }
-                )
-                NavigationBarItem(
-                    selected = currentScreen == Screen.DASHBOARD,
-                    onClick = { currentScreen = Screen.DASHBOARD },
-                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
-                    label = { Text("Dashboard".tr) }
-                )
-                NavigationBarItem(
-                    selected = currentScreen == Screen.TASKS,
-                    onClick = { currentScreen = Screen.TASKS },
-                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
-                    label = { Text("Tasks".tr) }
-                )
-                NavigationBarItem(
-                    selected = currentScreen == Screen.COURSES,
-                    onClick = { currentScreen = Screen.COURSES },
-                    icon = { Icon(Icons.Default.School, contentDescription = null) },
-                    label = { Text("Courses".tr) }
-                )
-                NavigationBarItem(
-                    selected = currentScreen == Screen.MORE,
-                    onClick = { currentScreen = Screen.MORE },
-                    icon = { Icon(Icons.Default.GridView, contentDescription = null) },
-                    label = { Text("More".tr) }
-                )
+                mainTabs.forEachIndexed { index, screen ->
+                    val (icon, label) = when (screen) {
+                        Screen.TIMETABLE -> Icons.Default.CalendarToday to "Timetable".tr
+                        Screen.DASHBOARD -> Icons.Default.Dashboard to "Dashboard".tr
+                        Screen.TASKS -> Icons.Default.CheckCircle to "Tasks".tr
+                        Screen.COURSES -> Icons.Default.School to "Courses".tr
+                        Screen.MORE -> Icons.Default.Widgets to "Tools".tr
+                        else -> Icons.Default.Menu to ""
+                    }
+                    NavigationBarItem(
+                        selected = activeSecondaryScreen == null && pagerState.currentPage == index,
+                        onClick = {
+                            activeSecondaryScreen = null
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        },
+                        icon = { Icon(icon, contentDescription = label) },
+                        label = { Text(label) }
+                    )
+                }
             }
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
-            when (currentScreen) {
-                Screen.TIMETABLE -> TimetableScreen(
-                    viewModel = scheduleViewModel,
-                    onNavigateToImport = { currentScreen = Screen.IMPORT },
-                    onNavigateToCourses = { currentScreen = Screen.COURSES },
-                    onOpenAcademicCalendar = { showAcademicCalendarModal = true }
-                )
-                Screen.DASHBOARD -> DashboardScreen(
-                    viewModel = scheduleViewModel,
-                    onNavigateToTimetable = { currentScreen = Screen.TIMETABLE },
-                    onNavigateToTasks = { currentScreen = Screen.TASKS },
-                    onOpenAcademicCalendar = { showAcademicCalendarModal = true }
-                )
-                Screen.TASKS -> TasksExamsScreen(
-                    viewModel = scheduleViewModel
-                )
-                Screen.COURSES -> CourseListScreen(
-                    viewModel = scheduleViewModel
-                )
-                Screen.MORE -> MoreOptionsScreen(
-                    viewModel = scheduleViewModel,
-                    onNavigateToAbout = { currentScreen = Screen.ABOUT },
-                    onNavigateToImport = { currentScreen = Screen.IMPORT },
-                    onNavigateToTasks = { currentScreen = Screen.TASKS },
-                    onNavigateToCourses = { currentScreen = Screen.COURSES }
-                )
+            when (activeSecondaryScreen) {
                 Screen.IMPORT -> ImportScheduleScreen(
                     importViewModel = importViewModel,
                     scheduleViewModel = scheduleViewModel,
-                    onFinishImport = { currentScreen = Screen.TIMETABLE }
+                    onFinishImport = {
+                        activeSecondaryScreen = null
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(0) // Go to Timetable
+                        }
+                    }
                 )
                 Screen.ABOUT -> AboutScreen()
+                else -> {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        when (mainTabs[page]) {
+                            Screen.TIMETABLE -> TimetableScreen(
+                                viewModel = scheduleViewModel,
+                                onNavigateToImport = { activeSecondaryScreen = Screen.IMPORT },
+                                onNavigateToCourses = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.COURSES))
+                                    }
+                                },
+                                onOpenAcademicCalendar = { showAcademicCalendarModal = true }
+                            )
+                            Screen.DASHBOARD -> DashboardScreen(
+                                viewModel = scheduleViewModel,
+                                onNavigateToTimetable = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.TIMETABLE))
+                                    }
+                                },
+                                onNavigateToTasks = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.TASKS))
+                                    }
+                                },
+                                onOpenAcademicCalendar = { showAcademicCalendarModal = true }
+                            )
+                            Screen.TASKS -> TasksExamsScreen(
+                                viewModel = scheduleViewModel
+                            )
+                            Screen.COURSES -> CourseListScreen(
+                                viewModel = scheduleViewModel
+                            )
+                            Screen.MORE -> MoreOptionsScreen(
+                                viewModel = scheduleViewModel,
+                                onNavigateToAbout = { activeSecondaryScreen = Screen.ABOUT },
+                                onNavigateToImport = { activeSecondaryScreen = Screen.IMPORT },
+                                onNavigateToTasks = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.TASKS))
+                                    }
+                                },
+                                onNavigateToCourses = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.COURSES))
+                                    }
+                                }
+                            )
+                            else -> {}
+                        }
+                    }
+                }
             }
 
             if (showAcademicCalendarModal) {
@@ -154,4 +201,3 @@ fun MainAppScaffold(
         }
     }
 }
-

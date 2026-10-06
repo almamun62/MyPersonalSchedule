@@ -15,9 +15,10 @@ import com.example.data.model.*
         Task::class,
         NotebookEntity::class,
         NoteEntity::class,
-        AcademicCalendarFileEntity::class
+        AcademicCalendarFileEntity::class,
+        CourseMaterialEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -29,6 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun notebookDao(): NotebookDao
     abstract fun noteDao(): NoteDao
     abstract fun academicCalendarFileDao(): AcademicCalendarFileDao
+    abstract fun courseMaterialDao(): CourseMaterialDao
 
 
     companion object {

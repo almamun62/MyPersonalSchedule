@@ -48,7 +48,7 @@ fun SectionTimingsDialog(
                     )
                 }
                 Text(
-                    text = "SWPU Timetable Preset • 12 Periods",
+                    text = "Standard Timetable Preset • 12 Periods",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -67,7 +67,7 @@ fun SectionTimingsDialog(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reset to Official SWPU Preset".tr)
+                    Text("Reset to Standard 12-Period Preset".tr)
                 }
 
                 editedTimings.forEach { timing ->

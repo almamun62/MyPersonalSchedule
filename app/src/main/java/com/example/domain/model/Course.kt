@@ -14,11 +14,14 @@ data class Course(
     val endPeriod: Int = 2,
     val startTime: String = "08:00",
     val endTime: String = "09:35",
+    val weekRule: WeekRule = WeekRule.ALL,
     val colorHex: String = "#5B9BF3",
     val semester: String = "Fall 2026",
     val credits: Int = 3,
+    val isRetake: Boolean = false,
     val notes: String = ""
 ) {
+
     val dayName: String
         get() = when (dayOfWeek) {
             1 -> "Monday"
@@ -69,10 +72,11 @@ data class Course(
             endPeriod = endPeriod,
             startTime = startTime,
             endTime = endTime,
-            weekRule = WeekRule.ALL,
+            weekRule = weekRule,
             customWeeks = "",
             colorHex = parsedColor,
             dndEnabled = true,
+            isRetake = isRetake,
             notes = notes
         )
     }
@@ -95,11 +99,14 @@ data class Course(
                 endPeriod = entity.endPeriod,
                 startTime = entity.startTime,
                 endTime = entity.endTime,
+                weekRule = entity.weekRule,
                 colorHex = hexString,
                 semester = semName,
                 credits = 3,
+                isRetake = entity.isRetake,
                 notes = entity.notes
             )
         }
     }
+
 }

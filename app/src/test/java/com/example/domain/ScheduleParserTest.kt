@@ -8,8 +8,8 @@ import org.junit.Test
 class ScheduleParserTest {
 
     @Test
-    fun testMamunPresetCourses() {
-        val courses = ScheduleParser.getMamunFall2026ImportedCourses()
+    fun testComputerSciencePresetCourses() {
+        val courses = ScheduleParser.getComputerSciencePreset()
         assertEquals(6, courses.size)
         assertTrue(courses.any { it.name.contains("Desktop Application Design") })
         assertTrue(courses.any { it.name.contains("Data Analysis & Machine Learning") })

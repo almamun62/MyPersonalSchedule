@@ -40,6 +40,7 @@ data class Course(
     val customWeeks: String = "",
     val colorHex: Long = 0xFF4F46E5,
     val dndEnabled: Boolean = true,
+    val isRetake: Boolean = false,
     val notes: String = ""
 ) {
     constructor(

@@ -5,6 +5,7 @@ import com.example.data.model.AcademicCalendarFileEntity
 import com.example.data.model.Course
 import com.example.data.model.CourseEntity
 import com.example.data.model.ExamEntity
+import com.example.data.model.NoteEntity
 import com.example.data.model.Task
 import kotlinx.coroutines.flow.Flow
 
@@ -30,5 +31,12 @@ class ScheduleRepository(val database: AppDatabase) {
     fun getAllCalendarFiles(): Flow<List<AcademicCalendarFileEntity>> = database.academicCalendarFileDao().getAllCalendarFiles()
     suspend fun insertCalendarFile(file: AcademicCalendarFileEntity): Long = database.academicCalendarFileDao().insertCalendarFile(file)
     suspend fun deleteCalendarFile(file: AcademicCalendarFileEntity) = database.academicCalendarFileDao().deleteCalendarFile(file)
-}
 
+    fun getAllNotes(): Flow<List<NoteEntity>> = database.noteDao().getAllNotes()
+    suspend fun insertNote(note: NoteEntity): Long = database.noteDao().insertNote(note)
+    suspend fun deleteNote(note: NoteEntity) = database.noteDao().deleteNote(note)
+
+    fun getAllCourseMaterials(): Flow<List<com.example.data.model.CourseMaterialEntity>> = database.courseMaterialDao().getAllMaterials()
+    suspend fun insertCourseMaterial(material: com.example.data.model.CourseMaterialEntity): Long = database.courseMaterialDao().insertMaterial(material)
+    suspend fun deleteCourseMaterial(material: com.example.data.model.CourseMaterialEntity) = database.courseMaterialDao().deleteMaterial(material)
+}

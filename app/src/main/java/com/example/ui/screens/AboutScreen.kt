@@ -15,6 +15,7 @@ import com.example.ui.theme.tr
 @Composable
 fun AboutScreen() {
     Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = { TopAppBar(title = { Text("About Application".tr, fontWeight = FontWeight.Bold) }) }
     ) { innerPadding ->
         Column(
@@ -26,13 +27,13 @@ fun AboutScreen() {
             verticalArrangement = Arrangement.Center
         ) {
             Text("Course Schedule", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Version 2.0 • SWPU Timetable Manager", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+            Text("Version 2.0 • University Timetable Manager", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
             Card(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("100% Offline Student Timetable Manager.", fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("Features automatic period mapping, SWPU preset schedule, class reminders, and Do Not Disturb automation during lectures.", fontSize = 13.sp)
+                    Text("Features automatic period mapping, preset major schedules, class reminders, and Do Not Disturb automation during lectures.", fontSize = 13.sp)
                 }
             }
         }
