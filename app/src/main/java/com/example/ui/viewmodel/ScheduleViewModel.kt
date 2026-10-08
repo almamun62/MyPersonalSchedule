@@ -72,6 +72,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         list.map { com.example.domain.model.Course.fromEntity(it) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val detectedConflicts: StateFlow<List<CourseConflict>> = filteredCourses.map { courses ->
+        com.example.domain.CourseConflictDetector.detectConflicts(courses)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         viewModelScope.launch {
             val list = allCourses.first()
@@ -122,6 +126,18 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     fun addCourse(course: com.example.domain.model.Course) {
         viewModelScope.launch {
             repository.insertCourse(course.toEntity())
+            rescheduleDndAlarms()
+        }
+    }
+
+    fun importCourses(courses: List<com.example.domain.model.Course>, replaceExisting: Boolean = false) {
+        viewModelScope.launch {
+            if (replaceExisting) {
+                repository.deleteAllCourses()
+            }
+            courses.forEach { course ->
+                repository.insertCourse(course.toEntity())
+            }
             rescheduleDndAlarms()
         }
     }
@@ -323,11 +339,32 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     fun generateShareCode(): String {
         return com.example.domain.parser.ShareCodeManager.generateShareCode(filteredCourses.value)
     }
+
+    fun exportScheduleAsJson(): String {
+        val array = org.json.JSONArray()
+        filteredCourses.value.forEach { c ->
+            val obj = org.json.JSONObject()
+            obj.put("name", c.name)
+            obj.put("code", c.code)
+            obj.put("classroom", c.classroom)
+            obj.put("instructor", c.instructor)
+            obj.put("dayOfWeek", c.dayOfWeek)
+            obj.put("startPeriod", c.startPeriod)
+            obj.put("endPeriod", c.endPeriod)
+            obj.put("startTime", c.startTime)
+            obj.put("endTime", c.endTime)
+            obj.put("weekRule", c.weekRule.name)
+            obj.put("colorHex", c.colorHex)
+            array.put(obj)
+        }
+        return array.toString(2)
+    }
 }
 
 enum class ScheduleViewMode {
     DAY,
     WEEK_GRID,
+    SEMESTER_OVERVIEW,
     TARGETED_RANGE
 }
 

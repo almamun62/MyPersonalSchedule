@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.local.UserPreferencesManager
 import com.example.data.model.WeekRule
+import com.example.domain.CourseConflictDetector
 import com.example.domain.model.Course
 import com.example.ui.theme.tr
 
@@ -98,6 +99,17 @@ fun AddEditCourseDialog(
             initialWeekRule = initialCourse?.weekRule ?: WeekRule.ALL,
             initialNotes = initialCourse?.notes ?: ""
         )
+    }
+
+    // Live conflict detector for current slot being configured
+    val conflictingExistingCourses = remember(slot.selectedDays.toList(), slot.startPeriod, slot.endPeriod, slot.weekRule, existingCourses) {
+        val days = if (slot.selectedDays.isEmpty()) listOf(initialDay) else slot.selectedDays.toList()
+        existingCourses.filter { existing ->
+            if (initialCourse != null && existing.id == initialCourse.id) return@filter false
+            days.contains(existing.dayOfWeek) &&
+                CourseConflictDetector.doWeekRulesOverlap(slot.weekRule, existing.weekRule) &&
+                (slot.startPeriod <= existing.endPeriod) && (existing.startPeriod <= slot.endPeriod)
+        }
     }
 
     fun handleSave() {
@@ -246,6 +258,29 @@ fun AddEditCourseDialog(
                                         .padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
+                                    // Conflict Warning Box
+                                    if (conflictingExistingCourses.isNotEmpty()) {
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
+                                                Text(
+                                                    text = "Overlaps with ${conflictingExistingCourses.joinToString { it.name }} at Period ${slot.startPeriod}-${slot.endPeriod}",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF92400E)
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     // 1. Course Name (Hero Input)
                                     OutlinedTextField(
                                         value = name,
@@ -325,6 +360,29 @@ fun AddEditCourseDialog(
                                 .padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
+                            // Conflict Warning Box
+                            if (conflictingExistingCourses.isNotEmpty()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
+                                        Text(
+                                            text = "Overlaps with ${conflictingExistingCourses.joinToString { it.name }} at Period ${slot.startPeriod}-${slot.endPeriod}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF92400E)
+                                        )
+                                    }
+                                }
+                            }
+
                             // 1. Course Name (Top, Big & Bold)
                             OutlinedTextField(
                                 value = name,

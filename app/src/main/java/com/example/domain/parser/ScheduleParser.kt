@@ -9,9 +9,17 @@ object ScheduleParser {
      * Supports both English and Chinese headers (e.g., 课程名称, 教室, 教师, 星期, 节次).
      */
     fun parseCsvSchedule(csvContent: String): List<ImportedCourse> {
-        val list = mutableListOf<ImportedCourse>()
-        val lines = csvContent.lines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return list
+        val trimmed = csvContent.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        // 1. Check if JSON
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            val jsonCourses = JsonScheduleParser.parseJsonSchedule(trimmed)
+            if (jsonCourses.isNotEmpty()) return jsonCourses
+        }
+
+        val lines = trimmed.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return emptyList()
 
         // Determine delimiter (comma, tab, or semicolon)
         val firstLine = lines.first()
@@ -21,6 +29,14 @@ object ScheduleParser {
             else -> ","
         }
 
+        // 2. Check if this is a 2D Matrix Grid (Columns = Days, Rows = Periods or vice-versa)
+        val rowList = lines.map { it.split(delimiter).map { cell -> cell.trim().removeSurrounding("\"") } }
+        val matrixCourses = MatrixTimetableParser.parseMatrixGrid(rowList)
+        if (matrixCourses.isNotEmpty()) {
+            return matrixCourses
+        }
+
+        val list = mutableListOf<ImportedCourse>()
         val headerParts = firstLine.split(delimiter).map { it.trim().removeSurrounding("\"").lowercase() }
 
         // Smart column index detection
@@ -31,6 +47,7 @@ object ScheduleParser {
         var dayIdx = headerParts.indexOfFirst { it.contains("day") || it.contains("week") || it.contains("星期") || it.contains("周") }
         var startPIdx = headerParts.indexOfFirst { it.contains("startp") || it.contains("fromp") || it.contains("start period") || it.contains("开始节") || it.contains("节次") }
         var endPIdx = headerParts.indexOfFirst { it.contains("endp") || it.contains("top") || it.contains("end period") || it.contains("结束节") }
+        var weekRuleIdx = headerParts.indexOfFirst { it.contains("rule") || it.contains("odd") || it.contains("even") || it.contains("单双") || it.contains("周次") }
 
         val hasHeader = nameIdx != -1 || dayIdx != -1 || roomIdx != -1
         val startLineIdx = if (hasHeader) 1 else 0
@@ -59,6 +76,13 @@ object ScheduleParser {
                 val startP = parts.getOrNull(startPIdx)?.toIntOrNull()?.coerceIn(1, 12) ?: 1
                 val endP = parts.getOrNull(endPIdx)?.toIntOrNull()?.coerceIn(startP, 12) ?: (startP + 1)
 
+                val rawRule = parts.getOrNull(weekRuleIdx)?.lowercase() ?: ""
+                val weekRule = when {
+                    rawRule.contains("odd") || rawRule.contains("单") -> com.example.data.model.WeekRule.ODD
+                    rawRule.contains("even") || rawRule.contains("双") -> com.example.data.model.WeekRule.EVEN
+                    else -> com.example.data.model.WeekRule.ALL
+                }
+
                 val (sTime, eTime) = defaultTimesForPeriods(startP, endP)
                 val color = listOf("#2563EB", "#10B981", "#F59E0B", "#EC4899", "#8B5CF6", "#EF4444")[list.size % 6]
 
@@ -73,6 +97,7 @@ object ScheduleParser {
                         endPeriod = endP,
                         startTime = sTime,
                         endTime = eTime,
+                        weekRule = weekRule,
                         colorHex = color
                     )
                 )
@@ -86,187 +111,21 @@ object ScheduleParser {
      * Extracts Course Name, Day, Periods (P1-2 / 第1-2节), Room, Instructor, and Week Rules.
      */
     fun parseFreeTextSchedule(text: String): List<ImportedCourse> {
-        val list = mutableListOf<ImportedCourse>()
-        // Split text by lines, semicolons, or double spaces
-        val blocks = text.split(Regex("[\n;;\r\n]+")).map { it.trim() }.filter { it.length > 3 }
-
-        for (block in blocks) {
-            val lower = block.lowercase()
-
-            // 1. Detect Day of Week
-            val dayOfWeek = parseDayOfWeek(block) ?: 1
-
-            // 2. Detect Period Range (e.g., P3-5, 1-2节, 第3-4节, 8:00-9:35, 10:00 AM - 11:15 AM)
-            var startP = 1
-            var endP = 2
-
-            // Match "第1-2节" or "1-2节" or "P1-2" or "period 3-5"
-            val periodRegex = Regex("(?:第|p|period)?\\s*(\\d{1,2})\\s*(?:-|至|到|~|\\s*-\\s*)\\s*(\\d{1,2})\\s*节?", RegexOption.IGNORE_CASE)
-            val periodMatch = periodRegex.find(block)
-
-            if (periodMatch != null) {
-                startP = periodMatch.groupValues[1].toIntOrNull()?.coerceIn(1, 12) ?: 1
-                endP = periodMatch.groupValues[2].toIntOrNull()?.coerceIn(startP, 12) ?: (startP + 1)
-            } else {
-                // Match exact clock times like 14:30-16:05 or 8:00
-                val clockRegex = Regex("(\\d{1,2}):(\\d{2})")
-                val clockMatches = clockRegex.findAll(block).toList()
-                if (clockMatches.isNotEmpty()) {
-                    val startHour = clockMatches[0].groupValues[1].toIntOrNull() ?: 8
-                    startP = when {
-                        startHour <= 8 -> 1
-                        startHour <= 10 -> 3
-                        startHour <= 14 -> 6
-                        startHour <= 16 -> 8
-                        else -> 10
-                    }
-                    endP = (startP + 1).coerceAtMost(12)
-                }
-            }
-
-            // 3. Extract Classroom / Room
-            var classroom = ""
-            val roomRegex = Regex("(?:教室|地点|room|bldg|lab|hall|楼|馆|室|实验室|\\b[A-Z]\\d{3}\\b|\\b\\d{3}\\b)", RegexOption.IGNORE_CASE)
-            val roomMatch = roomRegex.find(block)
-            if (roomMatch != null) {
-                val roomStart = roomMatch.range.first
-                val rawRoom = block.substring(maxOf(0, roomStart - 4), minOf(block.length, roomStart + 15)).trim()
-                classroom = rawRoom.take(20)
-            }
-            if (classroom.isBlank()) {
-                classroom = if (lower.contains("lab")) "Computer Lab" else "Classroom B101"
-            }
-
-            // 4. Extract Instructor
-            var instructor = ""
-            val profRegex = Regex("(?:prof\\.|professor|dr\\.|老师|教授|讲师|\\b[A-Z][a-z]+\\b)")
-            if (block.contains("Prof") || block.contains("Dr.") || block.contains("老师") || block.contains("教授")) {
-                val profMatch = profRegex.find(block)
-                if (profMatch != null) {
-                    instructor = profMatch.value
-                }
-            }
-            if (instructor.isBlank()) instructor = "Faculty Instructor"
-
-            // 5. Clean course name
-            var name = block
-                .replace(Regex("(?:周|星期)[一二三四五六日七1-7]"), "")
-                .replace(Regex("(?:第|p|period)?\\s*\\d{1,2}\\s*[-~至到]\\s*\\d{1,2}\\s*节?"), "")
-                .replace(Regex("(?:室|楼|馆|lab|room)\\s*\\w+"), "")
-                .replace(Regex("[,;\\(\\)\\[\\]]"), " ")
-                .trim()
-
-            val words = name.split("\\s+".toRegex()).filter { it.isNotBlank() }
-            name = if (words.isNotEmpty()) words.take(4).joinToString(" ") else "Custom Course ${list.size + 1}"
-            if (name.length > 35) name = name.take(35) + "..."
-
-            val (sTime, eTime) = defaultTimesForPeriods(startP, endP)
-            val colors = listOf("#2563EB", "#10B981", "#F59E0B", "#EC4899", "#8B5CF6", "#EF4444")
-
-            list.add(
-                ImportedCourse(
-                    name = name,
-                    code = "CS${100 + list.size * 5}",
-                    classroom = classroom,
-                    instructor = instructor,
-                    dayOfWeek = dayOfWeek,
-                    startPeriod = startP,
-                    endPeriod = endP,
-                    startTime = sTime,
-                    endTime = eTime,
-                    colorHex = colors[list.size % colors.size]
-                )
-            )
-        }
-
-        return list.ifEmpty {
-            listOf(
-                ImportedCourse(
-                    name = text.take(25).ifBlank { "Sample Course" },
-                    code = "CS101",
-                    classroom = "Lab 1",
-                    instructor = "Faculty",
-                    dayOfWeek = 1,
-                    startPeriod = 1,
-                    endPeriod = 2,
-                    startTime = "08:00",
-                    endTime = "09:35",
-                    colorHex = "#2563EB"
-                )
-            )
-        }
+        return FreeTextScheduleParser.parseText(text)
     }
 
     /**
      * Parse HTML timetable tables exported by Chinese university educational portals (正方, 强智, 树维).
      */
     fun parseHtmlSchedule(htmlContent: String): List<ImportedCourse> {
-        val list = mutableListOf<ImportedCourse>()
-        val tdRegex = Regex("(?i)(?s)<td[^>]*>(.*?)</td>")
-        val tdMatches = tdRegex.findAll(htmlContent).map { match ->
-            match.groupValues[1].replace(Regex("<[^>]*>"), " ").trim()
-        }.toList()
-
-        var currentDay = 1
-        for (cellText in tdMatches) {
-            if (cellText.length > 4 && !cellText.contains("星期") && !cellText.contains("节次") && !cellText.contains("时间")) {
-                val coursesFromCell = parseFreeTextSchedule(cellText)
-                for (c in coursesFromCell) {
-                    c.dayOfWeek = currentDay
-                    list.add(c)
-                }
-                currentDay = (currentDay % 5) + 1
-            }
-        }
-        return list.ifEmpty { parseFreeTextSchedule(htmlContent) }
+        return HtmlScheduleParser.parseHtmlContent(htmlContent)
     }
 
     /**
      * Parse iCalendar .ics format
      */
     fun parseIcsSchedule(icsContent: String): List<ImportedCourse> {
-        val list = mutableListOf<ImportedCourse>()
-        val events = icsContent.split("BEGIN:VEVENT")
-
-        for (event in events.drop(1)) {
-            var summary = "Course"
-            var location = "Room"
-            var description = ""
-            var dtstart = ""
-
-            event.lines().forEach { l ->
-                when {
-                    l.startsWith("SUMMARY:") -> summary = l.removePrefix("SUMMARY:").trim()
-                    l.startsWith("LOCATION:") -> location = l.removePrefix("LOCATION:").trim()
-                    l.startsWith("DESCRIPTION:") -> description = l.removePrefix("DESCRIPTION:").trim()
-                    l.startsWith("DTSTART") -> dtstart = l.substringAfter(":").trim()
-                }
-            }
-
-            if (summary.isNotBlank()) {
-                val day = parseDayFromIcsDtStart(dtstart) ?: ((list.size % 5) + 1)
-                val startP = 1 + (list.size % 4) * 2
-                val endP = (startP + 1).coerceAtMost(12)
-                val (sTime, eTime) = defaultTimesForPeriods(startP, endP)
-
-                list.add(
-                    ImportedCourse(
-                        name = summary,
-                        code = "101",
-                        classroom = location.ifEmpty { "Teaching Lab" },
-                        instructor = description.ifEmpty { "Professor" },
-                        dayOfWeek = day,
-                        startPeriod = startP,
-                        endPeriod = endP,
-                        startTime = sTime,
-                        endTime = eTime,
-                        colorHex = "#2563EB"
-                    )
-                )
-            }
-        }
-
-        return list.ifEmpty { parseFreeTextSchedule(icsContent) }
+        return IcsScheduleParser.parseIcsContent(icsContent)
     }
 
     private fun parseDayOfWeek(text: String): Int? {
@@ -300,7 +159,7 @@ object ScheduleParser {
         return null
     }
 
-    private fun defaultTimesForPeriods(startP: Int, endP: Int): Pair<String, String> {
+    fun defaultTimesForPeriods(startP: Int, endP: Int): Pair<String, String> {
         val s = when (startP) {
             1 -> "08:00"; 2 -> "08:50"; 3 -> "09:50"; 4 -> "10:40"; 5 -> "11:30"; 6 -> "14:30"; 7 -> "15:20"; 8 -> "16:20"; 9 -> "17:10"; 10 -> "19:00"; 11 -> "19:50"; else -> "20:40"
         }

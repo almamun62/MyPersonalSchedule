@@ -1,18 +1,52 @@
 package com.example.domain.parser
 
 import com.example.domain.model.ImportedCourse
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 
 object ExcelParser {
 
     /**
-     * Parse Excel files (.xlsx, .xls) and Spreadsheet XML tables into ImportedCourse lists.
-     * Uses lightweight stream-based string parsing to avoid heavy POI dependencies and OOM crashes.
+     * Parses Excel files:
+     * 1. Binary OOXML (.xlsx) packages via XlsxParser
+     * 2. XML Spreadsheet 2003 (<ss:Workbook>) tables
+     * 3. HTML tables disguised as .xls
+     * 4. Text/CSV/TSV formatted Excel exports (both matrix grid and record list)
+     */
+    fun parseExcelStream(inputStream: InputStream, fileName: String = ""): List<ImportedCourse> {
+        val bytes = inputStream.readBytes()
+
+        // Check if ZIP OOXML header (PK\u0003\u0004) -> Real .xlsx file
+        if (bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() && bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()) {
+            val list = XlsxParser.parseXlsxStream(ByteArrayInputStream(bytes))
+            if (list.isNotEmpty()) return list
+        }
+
+        // Try text-based formats (CSV, TSV, XML Spreadsheet 2003, HTML)
+        // Detect UTF-8, or fallback to GBK if contains Chinese encoding markers
+        val text = try {
+            String(bytes, Charsets.UTF_8)
+        } catch (e: Exception) {
+            String(bytes)
+        }
+
+        return parseExcelContent(text)
+    }
+
+    /**
+     * Parse text representations of spreadsheets (XML Spreadsheet 2003, HTML tables, or CSV/TSV).
      */
     fun parseExcelContent(content: String): List<ImportedCourse> {
-        val list = mutableListOf<ImportedCourse>()
+        val trimmed = content.trim()
 
-        // Check if content is XML Spreadsheet 2003 (<ss:Workbook> or <Table>)
-        if (content.contains("<Table") || content.contains("<ss:Table") || content.contains("<Workbook")) {
+        // Check if JSON format
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            val jsonList = JsonScheduleParser.parseJsonSchedule(trimmed)
+            if (jsonList.isNotEmpty()) return jsonList
+        }
+
+        // Check if XML Spreadsheet 2003 (<ss:Workbook> or <Table>)
+        if (content.contains("<Table", ignoreCase = true) || content.contains("<ss:Table", ignoreCase = true) || content.contains("<Workbook", ignoreCase = true)) {
             val rowRegex = Regex("(?i)(?s)<Row[^>]*>(.*?)</Row>")
             val cellRegex = Regex("(?i)(?s)<Data[^>]*>(.*?)</Data>")
 
@@ -23,6 +57,9 @@ object ExcelParser {
             }.toList()
 
             if (rows.isNotEmpty()) {
+                val matrixCourses = MatrixTimetableParser.parseMatrixGrid(rows)
+                if (matrixCourses.isNotEmpty()) return matrixCourses
+
                 val csvBuffer = StringBuilder()
                 for (row in rows) {
                     csvBuffer.append(row.joinToString(",")).append("\n")
@@ -31,7 +68,13 @@ object ExcelParser {
             }
         }
 
-        // Fallback to ScheduleParser CSV/TSV engine if text-based
+        // Check if it's HTML table disguised as .xls
+        if (content.contains("<table", ignoreCase = true) || content.contains("<tr", ignoreCase = true)) {
+            val htmlList = HtmlScheduleParser.parseHtmlContent(content)
+            if (htmlList.isNotEmpty()) return htmlList
+        }
+
+        // Fallback to ScheduleParser CSV/TSV engine
         return ScheduleParser.parseCsvSchedule(content)
     }
 }
