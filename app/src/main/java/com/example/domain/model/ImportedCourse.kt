@@ -47,7 +47,7 @@ data class ImportedCourse(
             else -> "?"
         }
 
-    fun toCourse(semester: String): Course = Course(
+    fun toCourse(semester: String = "Fall 2026"): Course = Course(
         id = 0,
         name = name.trim(),
         code = code.trim(),
@@ -64,4 +64,13 @@ data class ImportedCourse(
         credits = credits,
         isRetake = isRetake
     )
+
+    fun getMissingFieldWarning(): String? {
+        val missing = mutableListOf<String>()
+        if (name.isBlank() || name.startsWith("Course ")) missing.add("Name")
+        if (dayOfWeek !in 1..7) missing.add("Day")
+        if (startPeriod < 1 || endPeriod < startPeriod) missing.add("Period")
+        if (startTime.isBlank() || endTime.isBlank()) missing.add("Time")
+        return if (missing.isNotEmpty()) "Missing: ${missing.joinToString(", ")}" else null
+    }
 }

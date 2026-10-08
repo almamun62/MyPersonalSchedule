@@ -23,26 +23,14 @@ object FreeTextScheduleParser {
         val trimmed = text.trim()
         if (trimmed.isBlank()) return emptyList()
 
-        // 1. Check if user pasted a Share Code (SCH#...)
-        if (trimmed.startsWith("SCH#")) {
-            val shareCourses = ShareCodeManager.parseShareCode(trimmed)
-            if (shareCourses.isNotEmpty()) return shareCourses
-        }
-
-        // 2. Check if user pasted JSON
-        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            val jsonCourses = JsonScheduleParser.parseJsonSchedule(trimmed)
-            if (jsonCourses.isNotEmpty()) return jsonCourses
-        }
-
-        // 3. Check if user pasted tab-separated or matrix table
+        // 1. Check if user pasted tab-separated or matrix table
         if (trimmed.contains("\t")) {
             val rows = trimmed.lines().filter { it.isNotBlank() }.map { it.split("\t") }
             val matrixCourses = MatrixTimetableParser.parseMatrixGrid(rows)
             if (matrixCourses.isNotEmpty()) return matrixCourses
         }
 
-        // 4. Split by multiple newlines or single lines/semicolons
+        // 2. Split by multiple newlines or single lines/semicolons
         val rawBlocks = if (trimmed.contains("\n\n")) {
             trimmed.split(Regex("\n{2,}")).map { it.trim() }.filter { it.isNotBlank() }
         } else {

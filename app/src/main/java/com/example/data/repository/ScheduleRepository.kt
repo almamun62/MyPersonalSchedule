@@ -39,4 +39,9 @@ class ScheduleRepository(val database: AppDatabase) {
     fun getAllCourseMaterials(): Flow<List<com.example.data.model.CourseMaterialEntity>> = database.courseMaterialDao().getAllMaterials()
     suspend fun insertCourseMaterial(material: com.example.data.model.CourseMaterialEntity): Long = database.courseMaterialDao().insertMaterial(material)
     suspend fun deleteCourseMaterial(material: com.example.data.model.CourseMaterialEntity) = database.courseMaterialDao().deleteMaterial(material)
+
+    fun getAllReminders(): Flow<List<com.example.data.model.ReminderEntity>> = database.reminderDao().getAllReminders()
+    suspend fun insertReminder(reminder: com.example.data.model.ReminderEntity): Long = database.reminderDao().insertReminder(reminder)
+    suspend fun updateReminder(reminder: com.example.data.model.ReminderEntity) = database.reminderDao().updateReminder(reminder)
+    suspend fun deleteReminder(reminder: com.example.data.model.ReminderEntity) = database.reminderDao().deleteReminder(reminder)
 }

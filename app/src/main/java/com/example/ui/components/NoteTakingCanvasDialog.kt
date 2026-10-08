@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -20,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -37,8 +40,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.NoteEntity
 import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ScheduleViewModel
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.hypot
 
 data class DrawnPathState(
     val path: Path,
@@ -58,14 +63,18 @@ fun NoteTakingCanvasDialog(
     var noteTitle by remember { mutableStateOf("") }
     var noteTextContent by remember { mutableStateOf("") }
     var selectedCourseId by remember { mutableLongStateOf(initialCourseId) }
+    var currentNoteId by remember { mutableLongStateOf(0L) }
+    var isDirty by remember { mutableStateOf(false) }
+    var lastSavedStatus by remember { mutableStateOf<String?>(null) }
 
     val allCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
     val allNotes by viewModel.allNotes.collectAsStateWithLifecycle()
 
     // Canvas State
     val paths = remember { mutableStateListOf<DrawnPathState>() }
+    val redoStack = remember { mutableStateListOf<DrawnPathState>() }
     var currentPath by remember { mutableStateOf<Path?>(null) }
-    var currentPoints = remember { mutableStateListOf<Pair<Float, Float>>() }
+    val currentPoints = remember { mutableStateListOf<Pair<Float, Float>>() }
 
     val strokeColors = listOf(
         Color(0xFF0F172A), // Black
@@ -85,14 +94,86 @@ fun NoteTakingCanvasDialog(
         else allCourses.find { it.id == selectedCourseId }?.name ?: "General Note"
     }
 
+    // Helper to serialize strokes to JSON
+    fun serializeStrokesToJson(): String? {
+        if (paths.isEmpty()) return null
+        val arr = JSONArray()
+        paths.forEach { stroke ->
+            val obj = JSONObject()
+            obj.put("color", stroke.color.toArgb())
+            obj.put("strokeWidth", stroke.strokeWidth)
+            val pts = JSONArray()
+            stroke.pointsList.forEach { (x, y) ->
+                val ptObj = JSONObject()
+                ptObj.put("x", x)
+                ptObj.put("y", y)
+                pts.put(ptObj)
+            }
+            obj.put("points", pts)
+            arr.put(obj)
+        }
+        return arr.toString()
+    }
+
+    // Save/Autosave note to Room Database
+    fun saveNoteToRoom() {
+        if (noteTitle.isBlank() && noteTextContent.isBlank() && paths.isEmpty()) return
+
+        val titleToSave = noteTitle.ifBlank { "Note: $selectedCourseName" }
+        val drawingJson = serializeStrokesToJson()
+
+        viewModel.insertNote(
+            title = titleToSave,
+            content = noteTextContent,
+            courseId = selectedCourseId,
+            drawingJson = drawingJson
+        )
+        lastSavedStatus = "Saved"
+    }
+
+    // Autosave every 3 seconds if modified
+    LaunchedEffect(isDirty) {
+        if (isDirty) {
+            delay(3000L)
+            saveNoteToRoom()
+            isDirty = false
+        }
+    }
+
+    fun handleDismiss() {
+        if (isDirty || paths.isNotEmpty() || noteTitle.isNotBlank() || noteTextContent.isNotBlank()) {
+            saveNoteToRoom()
+        }
+        onDismiss()
+    }
+
+    // Eraser helper: removes strokes close to the touch position
+    fun eraseStrokesNear(x: Float, y: Float, radius: Float = 35f) {
+        val iterator = paths.iterator()
+        var removedAny = false
+        while (iterator.hasNext()) {
+            val stroke = iterator.next()
+            val intersects = stroke.pointsList.any { (px, py) ->
+                hypot(px - x, py - y) <= radius
+            }
+            if (intersects) {
+                iterator.remove()
+                removedAny = true
+            }
+        }
+        if (removedAny) {
+            isDirty = true
+        }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { handleDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.88f),
+                .fillMaxHeight(0.92f),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp
@@ -101,7 +182,7 @@ fun NoteTakingCanvasDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header Bar
                 Row(
@@ -110,20 +191,31 @@ fun NoteTakingCanvasDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Course & Lecture Notes".tr,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            lastSavedStatus?.let { status ->
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "• $status",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF10B981),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                         Text(
-                            text = "Course & Lecture Notes".tr,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Freehand Canvas • Text Memos • Local DB".tr,
+                            text = "Autosaved to Room • Linked to Course".tr,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = { handleDismiss() }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
@@ -160,13 +252,16 @@ fun NoteTakingCanvasDialog(
                 }
 
                 if (activeTab != 2) {
-                    // Title & Course Selector Row
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Title & Linked Course Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedTextField(
                             value = noteTitle,
-                            onValueChange = { noteTitle = it },
-                            label = { Text("Note Title *") },
-                            placeholder = { Text("e.g. Lecture 4: Data Structures & Graphs") },
+                            onValueChange = {
+                                noteTitle = it
+                                isDirty = true
+                            },
+                            label = { Text("Note Title") },
+                            placeholder = { Text("e.g. Lecture 4: Tree Traversal & Recursion") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
@@ -174,22 +269,33 @@ fun NoteTakingCanvasDialog(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Linked Course:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = "Course:",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 item {
                                     FilterChip(
                                         selected = selectedCourseId == 0L,
-                                        onClick = { selectedCourseId = 0L },
+                                        onClick = {
+                                            selectedCourseId = 0L
+                                            isDirty = true
+                                        },
                                         label = { Text("General", fontSize = 11.sp) }
                                     )
                                 }
                                 items(allCourses) { c ->
                                     FilterChip(
                                         selected = selectedCourseId == c.id,
-                                        onClick = { selectedCourseId = c.id },
+                                        onClick = {
+                                            selectedCourseId = c.id
+                                            isDirty = true
+                                        },
                                         label = { Text(c.name, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                                     )
                                 }
@@ -205,24 +311,27 @@ fun NoteTakingCanvasDialog(
                         .fillMaxWidth()
                 ) {
                     when (activeTab) {
-                        0 -> { // Freehand Canvas Draw Tab
+                        0 -> { // Canvas Draw Tab
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Tool Palette Row
+                                // Toolbar: Colors, Eraser, Undo, Redo, Clear
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     // Palette colors
-                                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) {
                                         items(strokeColors) { color ->
                                             val isSelected = currentColor == color && !isEraserMode
                                             Box(
                                                 modifier = Modifier
-                                                    .size(28.dp)
+                                                    .size(26.dp)
                                                     .clip(CircleShape)
                                                     .background(color)
                                                     .border(
@@ -238,7 +347,9 @@ fun NoteTakingCanvasDialog(
                                         }
                                     }
 
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    // Action buttons: Eraser, Undo, Redo, Clear
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        // Eraser
                                         IconButton(
                                             onClick = { isEraserMode = !isEraserMode },
                                             modifier = Modifier.size(32.dp)
@@ -249,15 +360,44 @@ fun NoteTakingCanvasDialog(
                                                 tint = if (isEraserMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
+
+                                        // Undo
                                         IconButton(
-                                            onClick = { if (paths.isNotEmpty()) paths.removeAt(paths.size - 1) },
+                                            onClick = {
+                                                if (paths.isNotEmpty()) {
+                                                    val popped = paths.removeAt(paths.size - 1)
+                                                    redoStack.add(popped)
+                                                    isDirty = true
+                                                }
+                                            },
                                             enabled = paths.isNotEmpty(),
                                             modifier = Modifier.size(32.dp)
                                         ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Undo")
+                                            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
                                         }
+
+                                        // Redo
                                         IconButton(
-                                            onClick = { paths.clear() },
+                                            onClick = {
+                                                if (redoStack.isNotEmpty()) {
+                                                    val restored = redoStack.removeAt(redoStack.size - 1)
+                                                    paths.add(restored)
+                                                    isDirty = true
+                                                }
+                                            },
+                                            enabled = redoStack.isNotEmpty(),
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                                        }
+
+                                        // Clear
+                                        IconButton(
+                                            onClick = {
+                                                paths.clear()
+                                                redoStack.clear()
+                                                isDirty = true
+                                            },
                                             enabled = paths.isNotEmpty(),
                                             modifier = Modifier.size(32.dp)
                                         ) {
@@ -266,12 +406,12 @@ fun NoteTakingCanvasDialog(
                                     }
                                 }
 
-                                // Stroke Width Selector
+                                // Thickness selection
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Thickness:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Width:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     listOf(3f to "Fine", 8f to "Medium", 16f to "Thick").forEach { (w, label) ->
                                         FilterChip(
                                             selected = currentStrokeWidth == w,
@@ -279,12 +419,18 @@ fun NoteTakingCanvasDialog(
                                             label = { Text(label, fontSize = 10.sp) }
                                         )
                                     }
+                                    if (isEraserMode) {
+                                        Text(
+                                            text = "• Eraser Mode Active (touch stroke to erase)",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.error,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
 
-                                // Drawing Canvas View
+                                // Drawing Canvas Box
                                 val canvasBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                val strokeColorActive = if (isEraserMode) canvasBg else currentColor
-
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -298,31 +444,43 @@ fun NoteTakingCanvasDialog(
                                             .pointerInput(currentColor, currentStrokeWidth, isEraserMode) {
                                                 detectDragGestures(
                                                     onDragStart = { offset ->
-                                                        val p = Path()
-                                                        p.moveTo(offset.x, offset.y)
-                                                        currentPath = p
-                                                        currentPoints.clear()
-                                                        currentPoints.add(Pair(offset.x, offset.y))
+                                                        if (isEraserMode) {
+                                                            eraseStrokesNear(offset.x, offset.y)
+                                                        } else {
+                                                            val p = Path()
+                                                            p.moveTo(offset.x, offset.y)
+                                                            currentPath = p
+                                                            currentPoints.clear()
+                                                            currentPoints.add(Pair(offset.x, offset.y))
+                                                        }
                                                     },
                                                     onDrag = { change, _ ->
                                                         val point = change.position
-                                                        currentPath?.lineTo(point.x, point.y)
-                                                        currentPoints.add(Pair(point.x, point.y))
+                                                        if (isEraserMode) {
+                                                            eraseStrokesNear(point.x, point.y)
+                                                        } else {
+                                                            currentPath?.lineTo(point.x, point.y)
+                                                            currentPoints.add(Pair(point.x, point.y))
+                                                        }
                                                         change.consume()
                                                     },
                                                     onDragEnd = {
-                                                        currentPath?.let { p ->
-                                                            paths.add(
-                                                                DrawnPathState(
-                                                                    path = p,
-                                                                    color = strokeColorActive,
-                                                                    strokeWidth = currentStrokeWidth,
-                                                                    pointsList = currentPoints.toList()
+                                                        if (!isEraserMode) {
+                                                            currentPath?.let { p ->
+                                                                paths.add(
+                                                                    DrawnPathState(
+                                                                        path = p,
+                                                                        color = currentColor,
+                                                                        strokeWidth = currentStrokeWidth,
+                                                                        pointsList = currentPoints.toList()
+                                                                    )
                                                                 )
-                                                            )
+                                                                redoStack.clear()
+                                                                isDirty = true
+                                                            }
+                                                            currentPath = null
+                                                            currentPoints.clear()
                                                         }
-                                                        currentPath = null
-                                                        currentPoints.clear()
                                                     }
                                                 )
                                             }
@@ -344,7 +502,7 @@ fun NoteTakingCanvasDialog(
                                         currentPath?.let { p ->
                                             drawPath(
                                                 path = p,
-                                                color = strokeColorActive,
+                                                color = currentColor,
                                                 style = Stroke(
                                                     width = currentStrokeWidth,
                                                     cap = StrokeCap.Round,
@@ -367,71 +525,70 @@ fun NoteTakingCanvasDialog(
                             }
                         }
 
-                        1 -> { // Text Note Tab
+                        1 -> { // Text Memo Tab
                             OutlinedTextField(
                                 value = noteTextContent,
-                                onValueChange = { noteTextContent = it },
-                                placeholder = { Text("Write detailed lecture summary, formulas, key definitions, or exam topics...") },
-                                modifier = Modifier
-                                    .fillMaxSize(),
+                                onValueChange = {
+                                    noteTextContent = it
+                                    isDirty = true
+                                },
+                                placeholder = { Text("Write lecture notes, formulas, questions, or assignment reminders...") },
+                                modifier = Modifier.fillMaxSize(),
                                 shape = RoundedCornerShape(16.dp)
                             )
                         }
 
-                        2 -> { // Saved Notes Tab
+                        2 -> { // Saved Notes List Tab
                             if (allNotes.isEmpty()) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.MenuBook,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(48.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("No Notes Saved Yet", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Text("Draw or write notes to save them locally in Room DB", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("No saved notes yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             } else {
                                 LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(allNotes) { note ->
+                                        val linkedName = remember(allCourses, note.courseId) {
+                                            if (note.courseId == 0L) "General"
+                                            else allCourses.find { it.id == note.courseId }?.name ?: "General"
+                                        }
+
                                         Card(
-                                            shape = RoundedCornerShape(16.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .padding(14.dp)
-                                                    .fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                    ) {
-                                                        Text(note.title.ifBlank { "Untitled Note" }, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                                        if (note.drawingDataJson != null) {
-                                                            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                                                                Text("🎨 Drawing", fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontWeight = FontWeight.Bold)
-                                                            }
-                                                        }
+                                            Column(modifier = Modifier.padding(12.dp)) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(note.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                        Text(
+                                                            text = "Course: $linkedName",
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
                                                     }
-                                                    if (note.content.isNotBlank()) {
-                                                        Text(note.content, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    IconButton(
+                                                        onClick = { viewModel.deleteNote(note) },
+                                                        modifier = Modifier.size(28.dp)
+                                                    ) {
+                                                        Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                                                     }
                                                 }
-
-                                                IconButton(onClick = { viewModel.deleteNote(note) }) {
-                                                    Icon(Icons.Outlined.Delete, contentDescription = "Delete Note", tint = MaterialTheme.colorScheme.error)
+                                                if (note.content.isNotBlank()) {
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = note.content,
+                                                        fontSize = 12.sp,
+                                                        maxLines = 3,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
                                                 }
                                             }
                                         }
@@ -442,43 +599,22 @@ fun NoteTakingCanvasDialog(
                     }
                 }
 
-                // Action Bar
+                // Bottom Save Action Bar
                 if (activeTab != 2) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = if (isDirty) "Auto-saving..." else "Autosave enabled",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
                         Button(
                             onClick = {
-                                val jsonPoints = if (paths.isNotEmpty()) {
-                                    val arr = JSONArray()
-                                    paths.forEach { stroke ->
-                                        val obj = JSONObject()
-                                        obj.put("color", stroke.color.toArgb())
-                                        obj.put("strokeWidth", stroke.strokeWidth)
-                                        val pts = JSONArray()
-                                        stroke.pointsList.forEach { (x, y) ->
-                                            val ptObj = JSONObject()
-                                            ptObj.put("x", x)
-                                            ptObj.put("y", y)
-                                            pts.put(ptObj)
-                                        }
-                                        obj.put("points", pts)
-                                        arr.put(obj)
-                                    }
-                                    arr.toString()
-                                } else null
-
-                                val titleToSave = noteTitle.ifBlank { "Lecture Note (${selectedCourseName})" }
-                                viewModel.insertNote(
-                                    title = titleToSave,
-                                    content = noteTextContent,
-                                    courseId = selectedCourseId,
-                                    drawingJson = jsonPoints
-                                )
-
-                                // Switch to saved notes list
+                                saveNoteToRoom()
                                 activeTab = 2
                             },
                             shape = RoundedCornerShape(12.dp),
@@ -486,7 +622,7 @@ fun NoteTakingCanvasDialog(
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save Note to Local DB".tr, fontWeight = FontWeight.Bold)
+                            Text("Save Now".tr, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

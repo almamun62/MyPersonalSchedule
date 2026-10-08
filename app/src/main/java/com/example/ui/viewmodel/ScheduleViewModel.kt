@@ -43,6 +43,9 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     val allCourseMaterials: StateFlow<List<com.example.data.model.CourseMaterialEntity>> = repository.getAllCourseMaterials()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allReminders: StateFlow<List<com.example.data.model.ReminderEntity>> = repository.getAllReminders()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _scheduleViewMode = MutableStateFlow(ScheduleViewMode.DAY)
     val scheduleViewMode: StateFlow<ScheduleViewMode> = _scheduleViewMode.asStateFlow()
 
@@ -119,7 +122,41 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     fun rescheduleDndAlarms() {
         viewModelScope.launch {
-            com.example.service.DndAutomationScheduler.scheduleAllDndAlarms(getApplication())
+            com.example.service.ClassReminderScheduler.rescheduleAllAlarms(getApplication())
+        }
+    }
+
+    fun addReminder(
+        title: String,
+        description: String = "",
+        triggerTimeMillis: Long,
+        repeatInterval: String = "NONE",
+        relatedType: String = "GENERAL",
+        relatedId: Long = 0L
+    ) {
+        viewModelScope.launch {
+            repository.insertReminder(
+                com.example.data.model.ReminderEntity(
+                    title = title,
+                    description = description,
+                    triggerTimeMillis = triggerTimeMillis,
+                    repeatInterval = repeatInterval,
+                    relatedType = relatedType,
+                    relatedId = relatedId
+                )
+            )
+            rescheduleDndAlarms()
+        }
+    }
+
+    fun deleteReminder(id: Long) {
+        viewModelScope.launch {
+            val list = allReminders.value
+            val target = list.find { it.id == id }
+            if (target != null) {
+                repository.deleteReminder(target)
+                rescheduleDndAlarms()
+            }
         }
     }
 
@@ -264,35 +301,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun syncScheduleToSystemCalendar(context: android.content.Context): Int {
-        var count = 0
-        try {
-            val courses = filteredCourses.value
-            val contentResolver = context.contentResolver
-            val calId = 1L // Primary calendar
 
-            courses.forEach { course ->
-                val values = android.content.ContentValues().apply {
-                    put(android.provider.CalendarContract.Events.DTSTART, System.currentTimeMillis() + 3600000L)
-                    put(android.provider.CalendarContract.Events.DTEND, System.currentTimeMillis() + 7200000L)
-                    put(android.provider.CalendarContract.Events.TITLE, "${course.name} (${course.code})")
-                    put(android.provider.CalendarContract.Events.DESCRIPTION, "Instructor: ${course.instructor} • Room: ${course.classroom}")
-                    put(android.provider.CalendarContract.Events.EVENT_LOCATION, course.classroom)
-                    put(android.provider.CalendarContract.Events.CALENDAR_ID, calId)
-                    put(android.provider.CalendarContract.Events.EVENT_TIMEZONE, java.util.TimeZone.getDefault().id)
-                    val byDay = when (course.dayOfWeek) {
-                        1 -> "MO"; 2 -> "TU"; 3 -> "WE"; 4 -> "TH"; 5 -> "FR"; 6 -> "SA"; else -> "SU"
-                    }
-                    put(android.provider.CalendarContract.Events.RRULE, "FREQ=WEEKLY;BYDAY=$byDay")
-                }
-                val uri = contentResolver.insert(android.provider.CalendarContract.Events.CONTENT_URI, values)
-                if (uri != null) count++
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return count
-    }
 
     fun setScheduleViewMode(mode: ScheduleViewMode) {
         _scheduleViewMode.value = mode
@@ -334,30 +343,6 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.deleteCourseMaterial(material)
         }
-    }
-
-    fun generateShareCode(): String {
-        return com.example.domain.parser.ShareCodeManager.generateShareCode(filteredCourses.value)
-    }
-
-    fun exportScheduleAsJson(): String {
-        val array = org.json.JSONArray()
-        filteredCourses.value.forEach { c ->
-            val obj = org.json.JSONObject()
-            obj.put("name", c.name)
-            obj.put("code", c.code)
-            obj.put("classroom", c.classroom)
-            obj.put("instructor", c.instructor)
-            obj.put("dayOfWeek", c.dayOfWeek)
-            obj.put("startPeriod", c.startPeriod)
-            obj.put("endPeriod", c.endPeriod)
-            obj.put("startTime", c.startTime)
-            obj.put("endTime", c.endTime)
-            obj.put("weekRule", c.weekRule.name)
-            obj.put("colorHex", c.colorHex)
-            array.put(obj)
-        }
-        return array.toString(2)
     }
 }
 

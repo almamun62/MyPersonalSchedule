@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,9 +22,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.domain.AppUpdateManager
-import com.example.ui.components.AppUpdateDialog
 import com.example.ui.theme.tr
 import com.example.ui.viewmodel.ScheduleViewModel
 
@@ -38,9 +34,14 @@ fun AboutScreen(
     BackHandler { onBack() }
 
     val context = LocalContext.current
-    var showUpdateDialog by remember { mutableStateOf(false) }
-    val repoPref by viewModel.userPreferencesManager.customGithubRepo.collectAsStateWithLifecycle()
-    val currentVersion = remember { AppUpdateManager.getCurrentVersion(context) }
+    val currentVersion = remember {
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "1.0"
+        } catch (e: Exception) {
+            "1.0"
+        }
+    }
 
     Scaffold(
         modifier = Modifier.statusBarsPadding(),
@@ -64,20 +65,20 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // App Identity Badge
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+            // App Branding Banner
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.size(80.dp)
             ) {
-                Icon(
-                    Icons.Outlined.School,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.School,
+                        contentDescription = "App Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -87,18 +88,18 @@ fun AboutScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Version $currentVersion • University Timetable Manager",
+                    text = "Version $currentVersion • 100% Offline Timetable Workspace",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium
                 )
             }
 
-            // GitHub Release Updater Card
+            // 100% Offline Guarantee Card
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -106,80 +107,25 @@ fun AboutScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Outlined.SystemUpdate,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "GitHub Releases Updater",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Installed: v$currentVersion",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Code,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Repo: $repoPref",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-
-                    Text(
-                        text = "When you publish a new tag/release (e.g. v2.1) with an attached APK on GitHub Releases, users can check, download, and install it directly inside this app without Google Play Store.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f),
-                        lineHeight = 17.sp
-                    )
-
-                    Button(
-                        onClick = { showUpdateDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Outlined.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Check for Updates Now", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "100% Offline at Runtime",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                     }
+                    Text(
+                        text = "Built with zero network permissions, zero telemetry, and zero accounts required. All course schedules, exams, tasks, notes, and preferences remain strictly inside your device's SQLite/Room local database.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
                 }
             }
 
-            // Overview Card
+            // Manual Releases Card
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
@@ -189,64 +135,72 @@ fun AboutScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.NewReleases, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Releases & Updates",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Updates are shipped via GitHub Releases. Users download new APK releases manually and install them using the Android file manager or browser.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 17.sp
+                    )
+
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mamunarman2004/CourseSchedule/releases"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("View Releases on GitHub", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            // Overview Card
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "100% Offline Student Workspace",
+                        text = "Features Overview",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                     Text(
-                        text = "Built specifically for students with zero telemetry, zero accounts required, and 100% offline local storage using SQLite/Room. Features automatic lecture timetable mapping, study calculator with GPA solver, touch note canvas, course materials reader, and smart class DND muting.",
-                        fontSize = 13.sp,
+                        text = "• Universal Schedule Import: Offline CSV, XLSX, and PDF text extraction\n" +
+                               "• Exact Alarms & Reminders: 15-minute class reminders & smart DND automation\n" +
+                               "• Study Focus Mode: Background countdown timer with screen-off support\n" +
+                               "• Lecture Note Canvas: Freehand drawing with autosave, undo/redo, and course linkage\n" +
+                               "• Study Calculator: Scientific calculator and GPA solver\n" +
+                               "• Home Screen Widget: Glance timetable overview",
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     )
                 }
             }
 
-            // Developer / Release Links
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        val repoUrl = "https://github.com/${repoPref.trim().removePrefix("https://github.com/")}"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("GitHub Repo", fontSize = 12.sp)
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        val releasesUrl = "https://github.com/${repoPref.trim().removePrefix("https://github.com/")}/releases"
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releasesUrl))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Outlined.NewReleases, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Releases", fontSize = 12.sp)
-                }
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
         }
-    }
-
-    if (showUpdateDialog) {
-        AppUpdateDialog(
-            viewModel = viewModel,
-            onDismiss = { showUpdateDialog = false }
-        )
     }
 }

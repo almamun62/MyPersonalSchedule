@@ -18,11 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.UserPreferencesManager
 import com.example.data.model.WeekRule
 import com.example.domain.CourseConflictDetector
@@ -34,30 +36,19 @@ private val DEFAULT_COLORS = listOf(
     "#10B981", // Emerald
     "#F59E0B", // Amber
     "#8B5CF6", // Purple
-    "#EC4899"  // Pink
+    "#EC4899", // Pink
+    "#06B6D4"  // Cyan
 )
 
-class TimeSlotHolder(
-    initialDayOfWeek: Int = 1,
-    initialStartPeriod: Int = 1,
-    initialEndPeriod: Int = 2,
-    initialStartTime: String = "08:00",
-    initialEndTime: String = "09:35",
-    initialClassroom: String = "",
-    initialInstructor: String = "",
-    initialWeekRule: WeekRule = WeekRule.ALL,
-    initialNotes: String = ""
-) {
-    val selectedDays = mutableStateListOf<Int>(initialDayOfWeek)
-    var startPeriod by mutableIntStateOf(initialStartPeriod)
-    var endPeriod by mutableIntStateOf(initialEndPeriod)
-    var startTime by mutableStateOf(initialStartTime)
-    var endTime by mutableStateOf(initialEndTime)
-    var classroom by mutableStateOf(initialClassroom)
-    var instructor by mutableStateOf(initialInstructor)
-    var weekRule by mutableStateOf(initialWeekRule)
-    var notes by mutableStateOf(initialNotes)
-}
+private val DAYS_OF_WEEK_LABELS = listOf(
+    1 to "Mon",
+    2 to "Tue",
+    3 to "Wed",
+    4 to "Thu",
+    5 to "Fri",
+    6 to "Sat",
+    7 to "Sun"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,80 +62,74 @@ fun AddEditCourseDialog(
     onSave: (Course) -> Unit,
     onSaveMultiple: ((List<Course>) -> Unit)? = null
 ) {
-    // Smart Defaults from previous course entry
-    val lastCourse = existingCourses.lastOrNull()
-    val defaultClassroom = initialCourse?.classroom ?: lastCourse?.classroom ?: ""
-    val defaultInstructor = initialCourse?.instructor ?: lastCourse?.instructor ?: ""
+    val context = LocalContext.current
+    val prefs = remember { UserPreferencesManager.getInstance(context) }
+    val lastUsedRoomPref by prefs.lastUsedRoom.collectAsStateWithLifecycle()
+    val lastUsedSemesterPref by prefs.lastUsedSemester.collectAsStateWithLifecycle()
+
+    // Smart Defaults from preferences or initialCourse
+    val defaultClassroom = initialCourse?.classroom ?: lastUsedRoomPref.ifBlank { "Room 101" }
+    val defaultSemesterValue = initialCourse?.semester ?: lastUsedSemesterPref.ifBlank { defaultSemester }
     val defaultColor = initialCourse?.colorHex ?: DEFAULT_COLORS[existingCourses.size % DEFAULT_COLORS.size]
 
+    // Primary Fields
     var name by remember { mutableStateOf(initialCourse?.name ?: "") }
+    var selectedDay by remember { mutableIntStateOf(initialCourse?.dayOfWeek ?: initialDay) }
+    var startPeriod by remember { mutableIntStateOf(initialCourse?.startPeriod ?: initialStartPeriod) }
+    var endPeriod by remember { mutableIntStateOf(initialCourse?.endPeriod ?: (initialStartPeriod + 1).coerceAtMost(12)) }
+    var room by remember { mutableStateOf(defaultClassroom) }
+    var weekRule by remember { mutableStateOf(initialCourse?.weekRule ?: WeekRule.ALL) }
+    var weekRangeText by remember { mutableStateOf(if (initialCourse?.weekRule == WeekRule.ALL) "1-16" else "") }
+
+    // Collapsible "More options"
+    var showMoreOptions by remember { mutableStateOf(false) }
     var code by remember { mutableStateOf(initialCourse?.code ?: "") }
-    var colorHex by remember { mutableStateOf(defaultColor) }
+    var instructor by remember { mutableStateOf(initialCourse?.instructor ?: "") }
     var credits by remember { mutableStateOf(initialCourse?.credits?.toString() ?: "3") }
-    var semester by remember { mutableStateOf(initialCourse?.semester ?: defaultSemester) }
+    var colorHex by remember { mutableStateOf(defaultColor) }
+    var semester by remember { mutableStateOf(defaultSemesterValue) }
+    var notes by remember { mutableStateOf(initialCourse?.notes ?: "") }
     var isRetake by remember { mutableStateOf(initialCourse?.isRetake ?: false) }
-    var showAdvancedOptions by remember { mutableStateOf(false) }
 
     val defaultTiming = UserPreferencesManager.defaultSectionTimings
+    val calculatedStartTime = defaultTiming.getOrNull(startPeriod - 1)?.startTime ?: "08:00"
+    val calculatedEndTime = defaultTiming.getOrNull(endPeriod - 1)?.endTime ?: "09:35"
 
-    val slot = remember {
-        TimeSlotHolder(
-            initialDayOfWeek = initialCourse?.dayOfWeek ?: initialDay,
-            initialStartPeriod = initialCourse?.startPeriod ?: initialStartPeriod,
-            initialEndPeriod = initialCourse?.endPeriod ?: (initialStartPeriod + 1).coerceAtMost(12),
-            initialStartTime = initialCourse?.startTime ?: defaultTiming.getOrNull(initialStartPeriod - 1)?.startTime ?: "08:00",
-            initialEndTime = initialCourse?.endTime ?: defaultTiming.getOrNull(initialStartPeriod)?.endTime ?: "09:35",
-            initialClassroom = defaultClassroom,
-            initialInstructor = defaultInstructor,
-            initialWeekRule = initialCourse?.weekRule ?: WeekRule.ALL,
-            initialNotes = initialCourse?.notes ?: ""
-        )
-    }
-
-    // Live conflict detector for current slot being configured
-    val conflictingExistingCourses = remember(slot.selectedDays.toList(), slot.startPeriod, slot.endPeriod, slot.weekRule, existingCourses) {
-        val days = if (slot.selectedDays.isEmpty()) listOf(initialDay) else slot.selectedDays.toList()
+    // Live conflict detector
+    val conflictingExistingCourses = remember(selectedDay, startPeriod, endPeriod, weekRule, existingCourses) {
         existingCourses.filter { existing ->
             if (initialCourse != null && existing.id == initialCourse.id) return@filter false
-            days.contains(existing.dayOfWeek) &&
-                CourseConflictDetector.doWeekRulesOverlap(slot.weekRule, existing.weekRule) &&
-                (slot.startPeriod <= existing.endPeriod) && (existing.startPeriod <= slot.endPeriod)
+            existing.dayOfWeek == selectedDay &&
+                    CourseConflictDetector.doWeekRulesOverlap(weekRule, existing.weekRule) &&
+                    (startPeriod <= existing.endPeriod) && (existing.startPeriod <= endPeriod)
         }
     }
 
     fun handleSave() {
         if (name.isBlank()) return
-        val generatedCourses = mutableListOf<Course>()
-        val daysList = if (slot.selectedDays.isEmpty()) listOf(initialDay) else slot.selectedDays.toList()
 
-        daysList.forEachIndexed { idx, dayNum ->
-            generatedCourses.add(
-                Course(
-                    id = if (idx == 0 && initialCourse != null) initialCourse.id else 0,
-                    name = name.trim(),
-                    code = code.trim(),
-                    instructor = slot.instructor.trim(),
-                    classroom = slot.classroom.trim(),
-                    dayOfWeek = dayNum,
-                    startPeriod = slot.startPeriod,
-                    endPeriod = slot.endPeriod,
-                    startTime = slot.startTime,
-                    endTime = slot.endTime,
-                    weekRule = slot.weekRule,
-                    colorHex = colorHex,
-                    semester = semester,
-                    credits = credits.toIntOrNull() ?: 3,
-                    isRetake = isRetake,
-                    notes = slot.notes.trim()
-                )
-            )
-        }
+        // Persist last-used room and semester
+        prefs.setLastUsedCourseMetadata(room = room, semester = semester)
 
-        if (generatedCourses.size > 1 && onSaveMultiple != null) {
-            onSaveMultiple(generatedCourses)
-        } else {
-            generatedCourses.firstOrNull()?.let { onSave(it) }
-        }
+        val courseToSave = Course(
+            id = initialCourse?.id ?: 0L,
+            name = name.trim(),
+            code = code.trim(),
+            instructor = instructor.trim(),
+            classroom = room.trim(),
+            dayOfWeek = selectedDay,
+            startPeriod = startPeriod,
+            endPeriod = endPeriod.coerceAtLeast(startPeriod),
+            startTime = calculatedStartTime,
+            endTime = calculatedEndTime,
+            weekRule = weekRule,
+            colorHex = colorHex,
+            semester = semester.trim(),
+            credits = credits.toIntOrNull() ?: 3,
+            isRetake = isRetake,
+            notes = notes.trim()
+        )
+        onSave(courseToSave)
     }
 
     Dialog(
@@ -152,18 +137,19 @@ fun AddEditCourseDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
         ) {
             Scaffold(
-                modifier = Modifier.statusBarsPadding(),
-                containerColor = MaterialTheme.colorScheme.background,
                 topBar = {
                     TopAppBar(
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                         title = {
                             Text(
-                                text = if (initialCourse == null) "Add Class".tr else "Edit Class".tr,
+                                text = if (initialCourse == null) "Add Course".tr else "Edit Course".tr,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
                             )
@@ -187,615 +173,336 @@ fun AddEditCourseDialog(
                     )
                 }
             ) { innerPadding ->
-                BoxWithConstraints(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    val isTabletWide = maxWidth >= 600.dp
-
-                    if (isTabletWide) {
-                        // ==========================================
-                        // TABLET 2-PANE MASTER-DETAIL LAYOUT
-                        // Left: Interactive Grid (Hero)
-                        // Right: Class Details (Name, Room, Teacher)
-                        // ==========================================
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    // Conflict warning if any
+                    if (conflictingExistingCourses.isNotEmpty()) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Left Pane: Big Interactive Schedule Grid
-                            Card(
-                                shape = RoundedCornerShape(20.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1.1f)
-                                    .fillMaxHeight()
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .verticalScroll(rememberScrollState())
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "🗓️ Schedule Grid",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "Tap a period to select. Tap another to set range.",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
+                                Text(
+                                    text = "Overlaps with ${conflictingExistingCourses.joinToString { it.name }} at Period $startPeriod-$endPeriod",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF92400E)
+                                )
+                            }
+                        }
+                    }
 
-                                    InteractiveScheduleGrid(
-                                        slot = slot,
-                                        defaultTiming = defaultTiming,
-                                        activeColorHex = colorHex
+                    // 1. Name
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Course Name *".tr, fontWeight = FontWeight.Bold) },
+                        placeholder = { Text("e.g. Calculus I, Data Structures") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    // 2. Day of Week
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Day of Week *".tr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            DAYS_OF_WEEK_LABELS.forEach { (dayNum, label) ->
+                                val isSelected = selectedDay == dayNum
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { selectedDay = dayNum },
+                                    label = { Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
+                        }
+                    }
+
+                    // 3. Start-End (Period & Time)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Periods & Time *".tr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = "$calculatedStartTime ~ $calculatedEndTime",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Start period selector
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Start Period", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { if (startPeriod > 1) { startPeriod--; if (endPeriod < startPeriod) endPeriod = startPeriod } },
+                                        enabled = startPeriod > 1
+                                    ) {
+                                        Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Decrease")
+                                    }
+                                    Text(
+                                        text = "Section $startPeriod",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(horizontal = 4.dp)
                                     )
+                                    IconButton(
+                                        onClick = { if (startPeriod < 12) { startPeriod++; if (endPeriod < startPeriod) endPeriod = startPeriod } },
+                                        enabled = startPeriod < 12
+                                    ) {
+                                        Icon(Icons.Default.AddCircleOutline, contentDescription = "Increase")
+                                    }
                                 }
                             }
 
-                            // Right Pane: Name, Room, Teacher, and Advanced Options
-                            Card(
-                                shape = RoundedCornerShape(20.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                modifier = Modifier
-                                    .weight(0.9f)
-                                    .fillMaxHeight()
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .verticalScroll(rememberScrollState())
-                                        .padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                                ) {
-                                    // Conflict Warning Box
-                                    if (conflictingExistingCourses.isNotEmpty()) {
-                                        Card(
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
-                                                Text(
-                                                    text = "Overlaps with ${conflictingExistingCourses.joinToString { it.name }} at Period ${slot.startPeriod}-${slot.endPeriod}",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF92400E)
-                                                )
-                                            }
-                                        }
+                            // End period selector
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("End Period", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = { if (endPeriod > startPeriod) endPeriod-- },
+                                        enabled = endPeriod > startPeriod
+                                    ) {
+                                        Icon(Icons.Default.RemoveCircleOutline, contentDescription = "Decrease")
                                     }
-
-                                    // 1. Course Name (Hero Input)
-                                    OutlinedTextField(
-                                        value = name,
-                                        onValueChange = { name = it },
-                                        label = { Text("Course Name *".tr, fontWeight = FontWeight.Bold) },
-                                        placeholder = { Text("e.g. Calculus, Physics") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(14.dp)
+                                    Text(
+                                        text = "Section $endPeriod",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(horizontal = 4.dp)
                                     )
+                                    IconButton(
+                                        onClick = { if (endPeriod < 12) endPeriod++ },
+                                        enabled = endPeriod < 12
+                                    ) {
+                                        Icon(Icons.Default.AddCircleOutline, contentDescription = "Increase")
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                                    // 2. Room & Teacher (Pre-filled)
+                    // 4. Room (Pre-filled with last-used room)
+                    OutlinedTextField(
+                        value = room,
+                        onValueChange = { room = it },
+                        label = { Text("Room / Location".tr) },
+                        placeholder = { Text("e.g. Science Bldg 302, Lab A") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    // 5. Weeks (All / Odd / Even / Range)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Weeks Rotation *".tr, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = weekRule == WeekRule.ALL && weekRangeText.isBlank(),
+                                onClick = { weekRule = WeekRule.ALL; weekRangeText = "" },
+                                label = { Text("All Weeks".tr, fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = weekRule == WeekRule.ODD,
+                                onClick = { weekRule = WeekRule.ODD; weekRangeText = "" },
+                                label = { Text("Odd (单周)".tr, fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = weekRule == WeekRule.EVEN,
+                                onClick = { weekRule = WeekRule.EVEN; weekRangeText = "" },
+                                label = { Text("Even (双周)".tr, fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = weekRangeText.isNotBlank(),
+                                onClick = {
+                                    weekRule = WeekRule.ALL
+                                    weekRangeText = if (weekRangeText.isBlank()) "1-16" else ""
+                                },
+                                label = { Text("Range".tr, fontSize = 12.sp) }
+                            )
+                        }
+
+                        if (weekRangeText.isNotBlank()) {
+                            OutlinedTextField(
+                                value = weekRangeText,
+                                onValueChange = { weekRangeText = it },
+                                label = { Text("Week Range (e.g. 1-16, 1-8)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    }
+
+                    // Collapsible "More options"
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showMoreOptions = !showMoreOptions }
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Outlined.Tune,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "More Options".tr,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Icon(
+                                    if (showMoreOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            AnimatedVisibility(visible = showMoreOptions) {
+                                Column(
+                                    modifier = Modifier.padding(top = 12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Code & Instructor
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         OutlinedTextField(
-                                            value = slot.classroom,
-                                            onValueChange = { slot.classroom = it },
-                                            label = { Text("Room".tr) },
-                                            placeholder = { Text("Room 302") },
+                                            value = code,
+                                            onValueChange = { code = it },
+                                            label = { Text("Course Code".tr) },
+                                            placeholder = { Text("CS101") },
                                             singleLine = true,
                                             modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(12.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                         OutlinedTextField(
-                                            value = slot.instructor,
-                                            onValueChange = { slot.instructor = it },
+                                            value = instructor,
+                                            onValueChange = { instructor = it },
                                             label = { Text("Teacher".tr) },
-                                            placeholder = { Text("Prof. Smith") },
+                                            placeholder = { Text("Prof. Turing") },
                                             singleLine = true,
                                             modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(12.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                     }
 
-                                    // 3. Collapsible Advanced Options
-                                    AdvancedOptionsSection(
-                                        colorHex = colorHex,
-                                        onColorChange = { colorHex = it },
-                                        code = code,
-                                        onCodeChange = { code = it },
-                                        credits = credits,
-                                        onCreditsChange = { credits = it },
-                                        isRetake = isRetake,
-                                        onRetakeChange = { isRetake = it },
-                                        slot = slot,
-                                        showAdvanced = showAdvancedOptions,
-                                        onToggleAdvanced = { showAdvancedOptions = !showAdvancedOptions }
-                                    )
-
-                                    Spacer(modifier = Modifier.weight(1f))
-
-                                    Button(
-                                        onClick = { handleSave() },
-                                        enabled = name.isNotBlank(),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ) {
-                                        Text("Save Course".tr, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // ==========================================
-                        // PHONE STREAMLINED 5-SECOND FLOW
-                        // 1. Course Name (Top)
-                        // 2. Room & Teacher (Pre-filled)
-                        // 3. Interactive Grid (The Main Event)
-                        // 4. Advanced Options (Collapsed by default)
-                        // ==========================================
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Conflict Warning Box
-                            if (conflictingExistingCourses.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
+                                    // Credits & Semester (Pre-filled with last-used semester)
                                     Row(
-                                        modifier = Modifier.padding(10.dp),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = credits,
+                                            onValueChange = { credits = it },
+                                            label = { Text("Credits".tr) },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(0.8f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        OutlinedTextField(
+                                            value = semester,
+                                            onValueChange = { semester = it },
+                                            label = { Text("Semester".tr) },
+                                            singleLine = true,
+                                            modifier = Modifier.weight(1.2f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                    }
+
+                                    // Color Picker
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text("Badge Color", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            DEFAULT_COLORS.forEach { hex ->
+                                                val c = Color(android.graphics.Color.parseColor(hex))
+                                                val isSelected = colorHex.equals(hex, ignoreCase = true)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape)
+                                                        .background(c)
+                                                        .border(
+                                                            width = if (isSelected) 3.dp else 1.dp,
+                                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                                            shape = CircleShape
+                                                        )
+                                                        .clickable { colorHex = hex }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Retake & Notes
+                                    Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Icon(Icons.Outlined.Warning, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(20.dp))
-                                        Text(
-                                            text = "Overlaps with ${conflictingExistingCourses.joinToString { it.name }} at Period ${slot.startPeriod}-${slot.endPeriod}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF92400E)
+                                        Checkbox(
+                                            checked = isRetake,
+                                            onCheckedChange = { isRetake = it }
                                         )
+                                        Text("Is Retake Course (重修)", fontSize = 13.sp)
                                     }
-                                }
-                            }
 
-                            // 1. Course Name (Top, Big & Bold)
-                            OutlinedTextField(
-                                value = name,
-                                onValueChange = { name = it },
-                                label = { Text("Course Name *".tr, fontWeight = FontWeight.Bold) },
-                                placeholder = { Text("e.g. Calculus, Physics") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp)
-                            )
-
-                            // 2. Room & Teacher (Pre-filled from previous entry)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = slot.classroom,
-                                    onValueChange = { slot.classroom = it },
-                                    label = { Text("Room".tr) },
-                                    placeholder = { Text("Room 302") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                OutlinedTextField(
-                                    value = slot.instructor,
-                                    onValueChange = { slot.instructor = it },
-                                    label = { Text("Teacher".tr) },
-                                    placeholder = { Text("Prof. Smith") },
-                                    singleLine = true,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                            }
-
-                            // 3. Interactive Grid (The Hero Event)
-                            Card(
-                                shape = RoundedCornerShape(18.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Row(
+                                    OutlinedTextField(
+                                        value = notes,
+                                        onValueChange = { notes = it },
+                                        label = { Text("Notes & Syllabus".tr) },
+                                        placeholder = { Text("Exam dates, grading policy...") },
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "🗓️ Schedule Grid",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = "Tap to set day & periods",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-
-                                    InteractiveScheduleGrid(
-                                        slot = slot,
-                                        defaultTiming = defaultTiming,
-                                        activeColorHex = colorHex
+                                        shape = RoundedCornerShape(10.dp)
                                     )
                                 }
                             }
-
-                            // 4. Collapsible Advanced Options (Hidden by default)
-                            AdvancedOptionsSection(
-                                colorHex = colorHex,
-                                onColorChange = { colorHex = it },
-                                code = code,
-                                onCodeChange = { code = it },
-                                credits = credits,
-                                onCreditsChange = { credits = it },
-                                isRetake = isRetake,
-                                onRetakeChange = { isRetake = it },
-                                slot = slot,
-                                showAdvanced = showAdvancedOptions,
-                                onToggleAdvanced = { showAdvancedOptions = !showAdvancedOptions }
-                            )
-
-                            Button(
-                                onClick = { handleSave() },
-                                enabled = name.isNotBlank(),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Text("Save Course".tr, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
-                }
-            }
-        }
-    }
-}
 
-/**
- * Clean, touch-friendly 7-Day x 12-Period Interactive Grid
- * Tapping a cell sets day and period.
- * Tapping another cell in the same day extends the period range (e.g. P1 to P3).
- * Tapping column header toggles multi-day selection (e.g. Mon, Wed, Fri).
- */
-@Composable
-private fun InteractiveScheduleGrid(
-    slot: TimeSlotHolder,
-    defaultTiming: List<com.example.data.model.SectionTiming>,
-    activeColorHex: String
-) {
-    val dayHeaders = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    val activeColor = try {
-        Color(android.graphics.Color.parseColor(activeColorHex))
-    } catch (e: Exception) {
-        MaterialTheme.colorScheme.primary
-    }
-
-    fun onCellClick(day: Int, period: Int) {
-        if (!slot.selectedDays.contains(day)) {
-            // Switch to this day and period
-            slot.selectedDays.clear()
-            slot.selectedDays.add(day)
-            slot.startPeriod = period
-            slot.endPeriod = period
-        } else {
-            // Already on this day
-            if (slot.startPeriod == period && slot.endPeriod == period) {
-                // already single period, keep
-            } else if (period in slot.startPeriod..slot.endPeriod) {
-                // Clicked inside existing range -> collapse to this single period
-                slot.startPeriod = period
-                slot.endPeriod = period
-            } else if (period > slot.endPeriod) {
-                // Extend end period (e.g. was P1-P2, clicked P3 -> P1-P3)
-                slot.endPeriod = period
-            } else if (period < slot.startPeriod) {
-                // Extend start period (e.g. was P3-P4, clicked P2 -> P2-P4)
-                slot.startPeriod = period
-            }
-        }
-
-        // Auto-calculate start & end times silently from global period timings
-        val sTiming = defaultTiming.getOrNull(slot.startPeriod - 1)
-        val eTiming = defaultTiming.getOrNull(slot.endPeriod - 1)
-        slot.startTime = sTiming?.startTime ?: "08:00"
-        slot.endTime = eTiming?.endTime ?: "09:35"
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // Day Headers Row (Tap to toggle multi-day)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Spacer(modifier = Modifier.width(32.dp))
-            dayHeaders.forEachIndexed { idx, h ->
-                val dayNum = idx + 1
-                val isSelectedDay = slot.selectedDays.contains(dayNum)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (isSelectedDay) activeColor.copy(alpha = 0.2f)
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            if (isSelectedDay && slot.selectedDays.size > 1) {
-                                slot.selectedDays.remove(dayNum)
-                            } else if (!isSelectedDay) {
-                                slot.selectedDays.add(dayNum)
-                            }
-                        }
-                        .padding(vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = h,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelectedDay) FontWeight.ExtraBold else FontWeight.Medium,
-                        color = if (isSelectedDay) activeColor else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        }
-
-        // Periods P1 to P12 Rows
-        for (p in 1..12) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Period Label
-                Box(
-                    modifier = Modifier
-                        .width(32.dp)
-                        .height(30.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Text(
-                        text = "P$p",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // 7 Day Cells
-                for (d in 1..7) {
-                    val isSelectedCell = slot.selectedDays.contains(d) && p in slot.startPeriod..slot.endPeriod
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(30.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (isSelectedCell) activeColor
-                                else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                            )
-                            .clickable { onCellClick(d, p) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSelectedCell) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Collapsible Advanced Options (Hidden by default to keep the main flow under 5 seconds)
- * Contains: 5-color palette, Credits/Code, Retake status, Custom times, Frequency
- */
-@Composable
-private fun AdvancedOptionsSection(
-    colorHex: String,
-    onColorChange: (String) -> Unit,
-    code: String,
-    onCodeChange: (String) -> Unit,
-    credits: String,
-    onCreditsChange: (String) -> Unit,
-    isRetake: Boolean,
-    onRetakeChange: (Boolean) -> Unit,
-    slot: TimeSlotHolder,
-    showAdvanced: Boolean,
-    onToggleAdvanced: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Toggle Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { onToggleAdvanced() }
-                .padding(vertical = 6.dp, horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.Tune,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = if (showAdvanced) "Hide Advanced Options" else "More Options (Color, Credits, Retake)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Icon(
-                if (showAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        AnimatedVisibility(visible = showAdvanced) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // 1. Color Palette (Compact 5 default colors)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Color Tag", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DEFAULT_COLORS.forEach { hex ->
-                            val isSelected = colorHex.equals(hex, ignoreCase = true)
-                            val col = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
-                            Box(
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(col)
-                                    .border(
-                                        width = if (isSelected) 2.5.dp else 0.dp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                                        shape = CircleShape
-                                    )
-                                    .clickable { onColorChange(hex) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2. Credits & Course Code (Compact row)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = code,
-                        onValueChange = onCodeChange,
-                        label = { Text("Code".tr) },
-                        placeholder = { Text("CS101") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    OutlinedTextField(
-                        value = credits,
-                        onValueChange = onCreditsChange,
-                        label = { Text("Credits".tr) },
-                        placeholder = { Text("3") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
-
-                // 3. Retake Status
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Course Retake", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text("Mark if retaking this class", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = isRetake, onCheckedChange = onRetakeChange)
-                }
-
-                // 4. Custom Times (Optional manual override)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = slot.startTime,
-                        onValueChange = { slot.startTime = it },
-                        label = { Text("Start Time") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    OutlinedTextField(
-                        value = slot.endTime,
-                        onValueChange = { slot.endTime = it },
-                        label = { Text("End Time") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
-
-                // 5. Frequency
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    val rules = listOf(
-                        WeekRule.ALL to "Weekly",
-                        WeekRule.ODD to "Odd",
-                        WeekRule.EVEN to "Even"
-                    )
-                    rules.forEachIndexed { idx, (rule, label) ->
-                        SegmentedButton(
-                            selected = slot.weekRule == rule,
-                            onClick = { slot.weekRule = rule },
-                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = rules.size)
-                        ) {
-                            Text(label, fontSize = 11.sp)
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
         }

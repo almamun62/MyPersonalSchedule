@@ -12,12 +12,6 @@ object ScheduleParser {
         val trimmed = csvContent.trim()
         if (trimmed.isEmpty()) return emptyList()
 
-        // 1. Check if JSON
-        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            val jsonCourses = JsonScheduleParser.parseJsonSchedule(trimmed)
-            if (jsonCourses.isNotEmpty()) return jsonCourses
-        }
-
         val lines = trimmed.lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return emptyList()
 
@@ -112,20 +106,6 @@ object ScheduleParser {
      */
     fun parseFreeTextSchedule(text: String): List<ImportedCourse> {
         return FreeTextScheduleParser.parseText(text)
-    }
-
-    /**
-     * Parse HTML timetable tables exported by Chinese university educational portals (正方, 强智, 树维).
-     */
-    fun parseHtmlSchedule(htmlContent: String): List<ImportedCourse> {
-        return HtmlScheduleParser.parseHtmlContent(htmlContent)
-    }
-
-    /**
-     * Parse iCalendar .ics format
-     */
-    fun parseIcsSchedule(icsContent: String): List<ImportedCourse> {
-        return IcsScheduleParser.parseIcsContent(icsContent)
     }
 
     private fun parseDayOfWeek(text: String): Int? {

@@ -68,7 +68,6 @@ fun MoreOptionsScreen(
     var showCalendarModal by remember { mutableStateOf(false) }
     var showNotesModal by remember { mutableStateOf(false) }
     var showCalculatorModal by remember { mutableStateOf(false) }
-    var showAppUpdateModal by remember { mutableStateOf(false) }
     var showDndPermissionDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -437,7 +436,7 @@ fun MoreOptionsScreen(
                     }
                 }
 
-                // 4. Subtle About, Update & Help links at the very bottom
+                // 4. Subtle About & Help links at the very bottom
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -452,16 +451,6 @@ fun MoreOptionsScreen(
                         Icon(Icons.Outlined.HelpOutline, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Guide", fontSize = 12.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = { showAppUpdateModal = true },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1.1f)
-                    ) {
-                        Icon(Icons.Outlined.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Update", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
 
                     OutlinedButton(
@@ -626,13 +615,6 @@ fun MoreOptionsScreen(
     if (showHelpModal) {
         HowToUseDialog(
             onDismiss = { showHelpModal = false }
-        )
-    }
-
-    if (showAppUpdateModal) {
-        com.example.ui.components.AppUpdateDialog(
-            viewModel = viewModel,
-            onDismiss = { showAppUpdateModal = false }
         )
     }
 }

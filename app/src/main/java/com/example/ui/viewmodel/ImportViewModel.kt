@@ -6,24 +6,13 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import com.example.domain.model.ImportedCourse
 import com.example.domain.parser.ExcelParser
-import com.example.domain.parser.JsonScheduleParser
+import com.example.domain.parser.PdfScheduleParser
 import com.example.domain.parser.ScheduleParser
-import com.example.domain.parser.ShareCodeManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class ImportTab {
-    FILE_PICKER,
-    FREE_TEXT,
-    VISUAL_GRID,
-    SHARE_CODE,
-    PRESETS
-}
-
 class ImportViewModel(application: Application) : AndroidViewModel(application) {
-    private val _currentTab = MutableStateFlow(ImportTab.FILE_PICKER)
-    val currentTab: StateFlow<ImportTab> = _currentTab.asStateFlow()
 
     private val _parsedCourses = MutableStateFlow<List<ImportedCourse>>(emptyList())
     val parsedCourses: StateFlow<List<ImportedCourse>> = _parsedCourses.asStateFlow()
@@ -31,12 +20,11 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
+    private val _isWarning = MutableStateFlow(false)
+    val isWarning: StateFlow<Boolean> = _isWarning.asStateFlow()
+
     private val _replaceExisting = MutableStateFlow(true)
     val replaceExisting: StateFlow<Boolean> = _replaceExisting.asStateFlow()
-
-    fun setTab(tab: ImportTab) {
-        _currentTab.value = tab
-    }
 
     fun setReplaceExisting(replace: Boolean) {
         _replaceExisting.value = replace
@@ -44,48 +32,19 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearStatusMessage() {
         _statusMessage.value = null
+        _isWarning.value = false
     }
 
     fun parseCsvContent(csvContent: String) {
         val result = ScheduleParser.parseCsvSchedule(csvContent)
         _parsedCourses.value = result
-        updateStatusAfterParse(result, "CSV / Spreadsheet data")
-    }
-
-    fun parseExcelContent(excelContent: String) {
-        val result = ExcelParser.parseExcelContent(excelContent)
-        _parsedCourses.value = result
-        updateStatusAfterParse(result, "Excel content")
+        updateStatusAfterParse(result, "CSV text")
     }
 
     fun parseFreeText(text: String) {
         val result = ScheduleParser.parseFreeTextSchedule(text)
         _parsedCourses.value = result
-        updateStatusAfterParse(result, "Text schedule")
-    }
-
-    fun parseHtmlContent(htmlContent: String) {
-        val result = ScheduleParser.parseHtmlSchedule(htmlContent)
-        _parsedCourses.value = result
-        updateStatusAfterParse(result, "HTML web timetable")
-    }
-
-    fun parseIcsContent(icsContent: String) {
-        val result = ScheduleParser.parseIcsSchedule(icsContent)
-        _parsedCourses.value = result
-        updateStatusAfterParse(result, "iCalendar (.ics)")
-    }
-
-    fun parseJsonContent(jsonContent: String) {
-        val result = JsonScheduleParser.parseJsonSchedule(jsonContent)
-        _parsedCourses.value = result
-        updateStatusAfterParse(result, "JSON schedule")
-    }
-
-    fun parseShareCode(shareCode: String) {
-        val result = ShareCodeManager.parseShareCode(shareCode)
-        _parsedCourses.value = result
-        updateStatusAfterParse(result, "Share Code")
+        updateStatusAfterParse(result, "Pasted text")
     }
 
     fun addManualCourse(course: ImportedCourse) {
@@ -93,15 +52,7 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         list.add(course)
         _parsedCourses.value = list
         _statusMessage.value = "Added course: ${course.name}"
-    }
-
-    fun loadPresetSchedule(presetType: String = "COMPUTER_SCI") {
-        val result = when (presetType) {
-            "SOFTWARE_ENG" -> ScheduleParser.getSoftwareEngineeringPreset()
-            else -> ScheduleParser.getComputerSciencePreset()
-        }
-        _parsedCourses.value = result
-        _statusMessage.value = "Loaded preset with ${result.size} courses."
+        _isWarning.value = false
     }
 
     fun removeParsedCourse(course: ImportedCourse) {
@@ -132,11 +83,11 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     fun clearParsedCourses() {
         _parsedCourses.value = emptyList()
         _statusMessage.value = null
+        _isWarning.value = false
     }
 
     /**
-     * 100% Offline Safe Universal File Parser.
-     * Uses binary InputStream for Excel (.xlsx/.xls) to prevent encoding corruption.
+     * 100% Offline Universal File Parser for CSV, XLSX, and PDF.
      */
     fun parseFileFromUri(uri: Uri) {
         try {
@@ -151,7 +102,23 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
             val lowerName = fileName.lowercase()
 
-            // 1. Excel (.xlsx / .xls) -> MUST parse as raw binary stream
+            // 1. PDF File -> Offline text extraction via pdfbox-android
+            if (lowerName.endsWith(".pdf")) {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val (courses, hasText) = PdfScheduleParser.parsePdfStream(context, stream)
+                    if (!hasText) {
+                        _parsedCourses.value = emptyList()
+                        _statusMessage.value = "No selectable text found in this PDF (it may be a scanned image). Please use manual add."
+                        _isWarning.value = true
+                        return
+                    }
+                    _parsedCourses.value = courses
+                    updateStatusAfterParse(courses, fileName)
+                }
+                return
+            }
+
+            // 2. Excel (.xlsx / .xls) -> Raw binary stream
             if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     val courses = ExcelParser.parseExcelStream(stream, fileName)
@@ -161,39 +128,24 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
                 return
             }
 
-            // 2. Text-based files (.ics, .json, .csv, .tsv, .html, .txt)
+            // 3. Text / CSV / TSV
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
             if (bytes.isEmpty()) {
                 _statusMessage.value = "Selected file '$fileName' is empty."
+                _isWarning.value = true
                 return
             }
 
-            // Attempt UTF-8, fallback to GBK / default charset if needed
             val content = try {
                 String(bytes, Charsets.UTF_8)
             } catch (e: Exception) {
                 String(bytes)
             }
 
-            val courses = when {
-                lowerName.endsWith(".ics") || content.contains("BEGIN:VCALENDAR", ignoreCase = true) -> {
-                    ScheduleParser.parseIcsSchedule(content)
-                }
-                lowerName.endsWith(".json") || content.trimStart().startsWith("[") || content.trimStart().startsWith("{") -> {
-                    JsonScheduleParser.parseJsonSchedule(content)
-                }
-                lowerName.endsWith(".html") || lowerName.endsWith(".htm") || content.contains("<table", ignoreCase = true) -> {
-                    ScheduleParser.parseHtmlSchedule(content)
-                }
-                lowerName.endsWith(".csv") || lowerName.endsWith(".tsv") -> {
-                    ScheduleParser.parseCsvSchedule(content)
-                }
-                content.contains("<Workbook", ignoreCase = true) || content.contains("<Table", ignoreCase = true) -> {
-                    ExcelParser.parseExcelContent(content)
-                }
-                else -> {
-                    ScheduleParser.parseFreeTextSchedule(content)
-                }
+            val courses = if (lowerName.endsWith(".csv") || lowerName.endsWith(".tsv") || content.contains(",")) {
+                ScheduleParser.parseCsvSchedule(content)
+            } else {
+                ScheduleParser.parseFreeTextSchedule(content)
             }
 
             _parsedCourses.value = courses
@@ -201,15 +153,29 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
         } catch (e: Exception) {
             e.printStackTrace()
-            _statusMessage.value = "Failed to parse file: ${e.localizedMessage ?: "Unknown error"}"
+            _statusMessage.value = "Error reading file: ${e.localizedMessage ?: "Unknown error"}"
+            _isWarning.value = true
         }
     }
 
     private fun updateStatusAfterParse(courses: List<ImportedCourse>, source: String) {
         if (courses.isNotEmpty()) {
-            _statusMessage.value = "Successfully recognized ${courses.size} courses from $source!"
+            _statusMessage.value = "Recognized ${courses.size} courses from $source!"
+            _isWarning.value = false
         } else {
-            _statusMessage.value = "No valid courses could be identified from $source. Check the formatting or try pasting into Smart Text."
+            _statusMessage.value = "No valid courses could be identified from $source. Check the formatting or use manual add."
+            _isWarning.value = true
         }
+    }
+
+    fun getSampleCsvTemplate(): String {
+        return """
+            Course,Classroom,Instructor,Day,StartPeriod,EndPeriod,WeekRule
+            Calculus I,Room 101,Prof. Newton,1,1,2,ALL
+            Linear Algebra,Room 203,Dr. Gauss,2,3,4,ALL
+            Data Structures,Software Lab 2,Prof. Turing,3,6,7,ALL
+            Physics Lab,Science Bldg B12,Dr. Curie,4,1,3,ODD
+            English Academic Writing,Liberal Arts 304,Ms. Austen,5,8,9,EVEN
+        """.trimIndent()
     }
 }

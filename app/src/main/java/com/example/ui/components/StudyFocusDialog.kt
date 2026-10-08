@@ -73,12 +73,85 @@ fun StudyFocusDialog(
     val allCourses by viewModel.filteredCourses.collectAsStateWithLifecycle()
     val allowedAppsPrefs by viewModel.userPreferencesManager.focusAllowedApps.collectAsStateWithLifecycle()
 
+    val prefs = viewModel.userPreferencesManager
+    val focusActivePref by prefs.focusActive.collectAsStateWithLifecycle()
+    val focusEndTimestampPref by prefs.focusEndTimestamp.collectAsStateWithLifecycle()
+    val focusTotalMinutesPref by prefs.focusTotalMinutes.collectAsStateWithLifecycle()
+    val focusCourseNamePref by prefs.focusCourseName.collectAsStateWithLifecycle()
+
     var selectedPresetMinutes by remember { mutableIntStateOf(25) }
     var selectedCourseName by remember { mutableStateOf("General Study") }
     var isRunning by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
+    var targetEndTimeMillis by remember { mutableLongStateOf(0L) }
     var remainingSeconds by remember { mutableIntStateOf(25 * 60) }
     var completedSessionsToday by remember { mutableIntStateOf(2) }
+
+    val hasUsageStats = remember(context) {
+        try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
+            val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                appOps?.unsafeCheckOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+            } else {
+                appOps?.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName)
+            }
+            mode == android.app.AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // Lock Task / Screen Pinning & Screen-On Lock
+    fun lockScreenAndPinApp() {
+        activity?.let { act ->
+            try {
+                act.startLockTask()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            try {
+                act.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                val controller = WindowCompat.getInsetsController(act.window, act.window.decorView)
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun unlockScreenAndUnpinApp() {
+        activity?.let { act ->
+            try {
+                act.stopLockTask()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            try {
+                act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                val controller = WindowCompat.getInsetsController(act.window, act.window.decorView)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // Restore running focus session if process was restarted
+    LaunchedEffect(focusActivePref, focusEndTimestampPref) {
+        if (focusActivePref && focusEndTimestampPref > System.currentTimeMillis()) {
+            targetEndTimeMillis = focusEndTimestampPref
+            selectedPresetMinutes = focusTotalMinutesPref
+            selectedCourseName = focusCourseNamePref
+            val remSec = ((focusEndTimestampPref - System.currentTimeMillis()) / 1000L).coerceAtLeast(0L).toInt()
+            remainingSeconds = remSec
+            isRunning = true
+            isPaused = false
+            lockScreenAndPinApp()
+        }
+    }
 
     var showEmergencyExitDialog by remember { mutableStateOf(false) }
     var showConfigureAppsDialog by remember { mutableStateOf(false) }
@@ -121,73 +194,39 @@ fun StudyFocusDialog(
         }
     }
 
-    // Lock Task / Screen Pinning & Screen-On Lock
-    fun lockScreenAndPinApp() {
-        activity?.let { act ->
-            try {
-                // Pin the app on screen (Screen Pinning / Lock Task)
-                act.startLockTask()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            try {
-                // Keep screen awake during study session
-                act.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-                // Immersive fullscreen mode
-                val controller = WindowCompat.getInsetsController(act.window, act.window.decorView)
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun unlockScreenAndUnpinApp() {
-        activity?.let { act ->
-            try {
-                act.stopLockTask()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            try {
-                act.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                val controller = WindowCompat.getInsetsController(act.window, act.window.decorView)
-                controller.show(WindowInsetsCompat.Type.systemBars())
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
     // Intercept back button when active: User cannot close app during Focus Mode
     BackHandler(enabled = isRunning) {
         showEmergencyExitDialog = true
     }
 
-    // Countdown Coroutine
-    LaunchedEffect(isRunning, isPaused) {
-        while (isRunning && !isPaused && remainingSeconds > 0) {
+    // Countdown Coroutine driven by targetEndTimeMillis
+    LaunchedEffect(isRunning, isPaused, targetEndTimeMillis) {
+        while (isRunning && !isPaused) {
+            val now = System.currentTimeMillis()
+            val remSec = ((targetEndTimeMillis - now) / 1000L).coerceAtLeast(0L).toInt()
+            remainingSeconds = remSec
+            if (remSec <= 0) {
+                isRunning = false
+                completedSessionsToday++
+                unlockScreenAndUnpinApp()
+                prefs.clearFocusSession()
+                FocusLockService.stopFocus(context)
+                break
+            }
             delay(1000L)
-            remainingSeconds--
-        }
-        if (remainingSeconds <= 0 && isRunning) {
-            isRunning = false
-            completedSessionsToday++
-            unlockScreenAndUnpinApp()
-            FocusLockService.stopFocus(context)
         }
     }
 
     fun startTimer() {
-        remainingSeconds = selectedPresetMinutes * 60
+        val durationMin = selectedPresetMinutes
+        val endMs = System.currentTimeMillis() + (durationMin * 60 * 1000L)
+        targetEndTimeMillis = endMs
+        remainingSeconds = durationMin * 60
         isRunning = true
         isPaused = false
+        prefs.setFocusSession(active = true, endTimestamp = endMs, totalMinutes = durationMin, courseName = selectedCourseName)
         lockScreenAndPinApp()
-        FocusLockService.startFocus(context, selectedPresetMinutes, selectedCourseName)
+        FocusLockService.startFocus(context, durationMin, selectedCourseName, endMs)
     }
 
     fun pauseTimer() {
@@ -195,7 +234,11 @@ fun StudyFocusDialog(
     }
 
     fun resumeTimer() {
-        isPaused = false
+        if (targetEndTimeMillis > System.currentTimeMillis()) {
+            isPaused = false
+        } else {
+            startTimer()
+        }
     }
 
     val totalSec = (selectedPresetMinutes * 60).coerceAtLeast(1)

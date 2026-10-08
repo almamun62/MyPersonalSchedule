@@ -37,14 +37,6 @@ object ExcelParser {
      * Parse text representations of spreadsheets (XML Spreadsheet 2003, HTML tables, or CSV/TSV).
      */
     fun parseExcelContent(content: String): List<ImportedCourse> {
-        val trimmed = content.trim()
-
-        // Check if JSON format
-        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-            val jsonList = JsonScheduleParser.parseJsonSchedule(trimmed)
-            if (jsonList.isNotEmpty()) return jsonList
-        }
-
         // Check if XML Spreadsheet 2003 (<ss:Workbook> or <Table>)
         if (content.contains("<Table", ignoreCase = true) || content.contains("<ss:Table", ignoreCase = true) || content.contains("<Workbook", ignoreCase = true)) {
             val rowRegex = Regex("(?i)(?s)<Row[^>]*>(.*?)</Row>")
@@ -66,12 +58,6 @@ object ExcelParser {
                 }
                 return ScheduleParser.parseCsvSchedule(csvBuffer.toString())
             }
-        }
-
-        // Check if it's HTML table disguised as .xls
-        if (content.contains("<table", ignoreCase = true) || content.contains("<tr", ignoreCase = true)) {
-            val htmlList = HtmlScheduleParser.parseHtmlContent(content)
-            if (htmlList.isNotEmpty()) return htmlList
         }
 
         // Fallback to ScheduleParser CSV/TSV engine

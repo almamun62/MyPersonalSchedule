@@ -3,7 +3,6 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.model.SectionTiming
-import com.example.domain.AppUpdateManager
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.AppThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +27,52 @@ class UserPreferencesManager(context: Context) {
     private val _isClassReminder15mEnabled = MutableStateFlow(prefs.getBoolean(KEY_CLASS_REMINDER_15M, true))
     val isClassReminder15mEnabled: StateFlow<Boolean> = _isClassReminder15mEnabled.asStateFlow()
 
+    private val _lastUsedRoom = MutableStateFlow(prefs.getString(KEY_LAST_USED_ROOM, "Room 101") ?: "Room 101")
+    val lastUsedRoom: StateFlow<String> = _lastUsedRoom.asStateFlow()
+
+    private val _lastUsedSemester = MutableStateFlow(prefs.getString(KEY_LAST_USED_SEMESTER, "Fall 2026") ?: "Fall 2026")
+    val lastUsedSemester: StateFlow<String> = _lastUsedSemester.asStateFlow()
+
+    fun setLastUsedCourseMetadata(room: String, semester: String) {
+        if (room.isNotBlank()) {
+            prefs.edit().putString(KEY_LAST_USED_ROOM, room.trim()).apply()
+            _lastUsedRoom.value = room.trim()
+        }
+        if (semester.isNotBlank()) {
+            prefs.edit().putString(KEY_LAST_USED_SEMESTER, semester.trim()).apply()
+            _lastUsedSemester.value = semester.trim()
+        }
+    }
+
+    private val _focusActive = MutableStateFlow(prefs.getBoolean(KEY_FOCUS_ACTIVE, false))
+    val focusActive: StateFlow<Boolean> = _focusActive.asStateFlow()
+
+    private val _focusEndTimestamp = MutableStateFlow(prefs.getLong(KEY_FOCUS_END_TIMESTAMP, 0L))
+    val focusEndTimestamp: StateFlow<Long> = _focusEndTimestamp.asStateFlow()
+
+    private val _focusTotalMinutes = MutableStateFlow(prefs.getInt(KEY_FOCUS_TOTAL_MINUTES, 25))
+    val focusTotalMinutes: StateFlow<Int> = _focusTotalMinutes.asStateFlow()
+
+    private val _focusCourseName = MutableStateFlow(prefs.getString(KEY_FOCUS_COURSE_NAME, "General Study") ?: "General Study")
+    val focusCourseName: StateFlow<String> = _focusCourseName.asStateFlow()
+
+    fun setFocusSession(active: Boolean, endTimestamp: Long = 0L, totalMinutes: Int = 25, courseName: String = "General Study") {
+        prefs.edit()
+            .putBoolean(KEY_FOCUS_ACTIVE, active)
+            .putLong(KEY_FOCUS_END_TIMESTAMP, endTimestamp)
+            .putInt(KEY_FOCUS_TOTAL_MINUTES, totalMinutes)
+            .putString(KEY_FOCUS_COURSE_NAME, courseName)
+            .apply()
+        _focusActive.value = active
+        _focusEndTimestamp.value = endTimestamp
+        _focusTotalMinutes.value = totalMinutes
+        _focusCourseName.value = courseName
+    }
+
+    fun clearFocusSession() {
+        setFocusSession(active = false, endTimestamp = 0L, totalMinutes = 25, courseName = "General Study")
+    }
+
     private val _showNotchMode = MutableStateFlow(prefs.getBoolean(KEY_SHOW_NOTCH, true))
     val showNotchMode: StateFlow<Boolean> = _showNotchMode.asStateFlow()
 
@@ -42,15 +87,6 @@ class UserPreferencesManager(context: Context) {
     private val defaultAllowedApps = "internal_calculator,internal_notes,internal_materials"
     private val _focusAllowedApps = MutableStateFlow(loadFocusAllowedApps())
     val focusAllowedApps: StateFlow<List<String>> = _focusAllowedApps.asStateFlow()
-
-    private val _customGithubRepo = MutableStateFlow(prefs.getString(KEY_GITHUB_REPO, AppUpdateManager.DEFAULT_GITHUB_REPO) ?: AppUpdateManager.DEFAULT_GITHUB_REPO)
-    val customGithubRepo: StateFlow<String> = _customGithubRepo.asStateFlow()
-
-    fun setCustomGithubRepo(repo: String) {
-        val clean = repo.trim()
-        prefs.edit().putString(KEY_GITHUB_REPO, clean).apply()
-        _customGithubRepo.value = clean
-    }
 
     private val _classReminderMinutes = MutableStateFlow(prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15))
     val classReminderMinutes: StateFlow<Int> = _classReminderMinutes.asStateFlow()
@@ -191,7 +227,12 @@ class UserPreferencesManager(context: Context) {
         private const val KEY_DASHBOARD_ORDER = "pref_dashboard_order"
         private const val KEY_DASHBOARD_HIDDEN = "pref_dashboard_hidden"
         private const val KEY_FOCUS_ALLOWED_APPS = "pref_focus_allowed_apps"
-        private const val KEY_GITHUB_REPO = "pref_github_repo"
+        private const val KEY_LAST_USED_ROOM = "pref_last_used_room"
+        private const val KEY_LAST_USED_SEMESTER = "pref_last_used_semester"
+        private const val KEY_FOCUS_ACTIVE = "pref_focus_active"
+        private const val KEY_FOCUS_END_TIMESTAMP = "pref_focus_end_timestamp"
+        private const val KEY_FOCUS_TOTAL_MINUTES = "pref_focus_total_minutes"
+        private const val KEY_FOCUS_COURSE_NAME = "pref_focus_course_name"
 
         val defaultSectionTimings = listOf(
             SectionTiming(1, "08:00", "08:45"),
