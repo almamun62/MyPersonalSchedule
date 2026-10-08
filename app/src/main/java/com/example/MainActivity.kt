@@ -134,7 +134,10 @@ fun MainAppScaffold(
                         }
                     }
                 )
-                Screen.ABOUT -> AboutScreen()
+                Screen.ABOUT -> AboutScreen(
+                    viewModel = scheduleViewModel,
+                    onBack = { activeSecondaryScreen = null }
+                )
                 else -> {
                     HorizontalPager(
                         state = pagerState,

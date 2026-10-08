@@ -3,6 +3,7 @@ package com.example.data.local
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.data.model.SectionTiming
+import com.example.domain.AppUpdateManager
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.AppThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,15 @@ class UserPreferencesManager(context: Context) {
     private val defaultAllowedApps = "internal_calculator,internal_notes,internal_materials"
     private val _focusAllowedApps = MutableStateFlow(loadFocusAllowedApps())
     val focusAllowedApps: StateFlow<List<String>> = _focusAllowedApps.asStateFlow()
+
+    private val _customGithubRepo = MutableStateFlow(prefs.getString(KEY_GITHUB_REPO, AppUpdateManager.DEFAULT_GITHUB_REPO) ?: AppUpdateManager.DEFAULT_GITHUB_REPO)
+    val customGithubRepo: StateFlow<String> = _customGithubRepo.asStateFlow()
+
+    fun setCustomGithubRepo(repo: String) {
+        val clean = repo.trim()
+        prefs.edit().putString(KEY_GITHUB_REPO, clean).apply()
+        _customGithubRepo.value = clean
+    }
 
     private val _classReminderMinutes = MutableStateFlow(prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15))
     val classReminderMinutes: StateFlow<Int> = _classReminderMinutes.asStateFlow()
@@ -181,6 +191,7 @@ class UserPreferencesManager(context: Context) {
         private const val KEY_DASHBOARD_ORDER = "pref_dashboard_order"
         private const val KEY_DASHBOARD_HIDDEN = "pref_dashboard_hidden"
         private const val KEY_FOCUS_ALLOWED_APPS = "pref_focus_allowed_apps"
+        private const val KEY_GITHUB_REPO = "pref_github_repo"
 
         val defaultSectionTimings = listOf(
             SectionTiming(1, "08:00", "08:45"),
