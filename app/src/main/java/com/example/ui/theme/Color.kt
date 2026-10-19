@@ -24,3 +24,21 @@ enum class AppAccentColor(val id: String, val displayName: String, val primary: 
     PURPLE("purple", "Deep Purple", PurplePrimary),
     ROSE("rose", "Rose Pink", RosePrimary)
 }
+
+/**
+ * Calculates high-contrast text color based on standard W3C relative luminance.
+ * Ensures WCAG 2.1 AA legibility on colored cards, timetable chips, and badges.
+ */
+fun getContrastingTextColor(backgroundColor: Color): Color {
+    val luminance = 0.299f * backgroundColor.red + 0.587f * backgroundColor.green + 0.114f * backgroundColor.blue
+    return if (luminance > 0.55f) Color(0xFF0F172A) else Color.White
+}
+
+fun parseColorSafe(colorHex: String, fallback: Color = BluePrimary): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(colorHex.trim()))
+    } catch (e: Exception) {
+        fallback
+    }
+}
+

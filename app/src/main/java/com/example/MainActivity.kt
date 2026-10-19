@@ -70,20 +70,31 @@ fun MainAppScaffold(
     importViewModel: ImportViewModel
 ) {
     val mainTabs = remember { listOf(Screen.TIMETABLE, Screen.DASHBOARD, Screen.TASKS, Screen.COURSES, Screen.MORE) }
-    val pagerState = rememberPagerState(initialPage = 1) { mainTabs.size }
+    val defaultStartupScreen by scheduleViewModel.userPreferencesManager.defaultStartupScreen.collectAsState()
+    val initialPage = remember {
+        if (defaultStartupScreen == "DASHBOARD") 1 else 0
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage) { mainTabs.size }
     val coroutineScope = rememberCoroutineScope()
     var activeSecondaryScreen by remember { mutableStateOf<Screen?>(null) }
     var showAcademicCalendarModal by remember { mutableStateOf(false) }
 
+    val timetableLabel = "Timetable".tr
+    val dashboardLabel = "Dashboard".tr
+    val tasksLabel = "Tasks".tr
+    val coursesLabel = "Courses".tr
+    val toolsLabel = "Tools".tr
+
     // Back handler management
+    val homeIndex = remember(defaultStartupScreen) { if (defaultStartupScreen == "DASHBOARD") 1 else 0 }
     if (activeSecondaryScreen != null) {
         BackHandler {
             activeSecondaryScreen = null
         }
-    } else if (pagerState.currentPage != 1) { // Default tab is Dashboard (index 1)
+    } else if (pagerState.currentPage != homeIndex) {
         BackHandler {
             coroutineScope.launch {
-                pagerState.animateScrollToPage(1)
+                pagerState.animateScrollToPage(homeIndex)
             }
         }
     }
@@ -96,11 +107,11 @@ fun MainAppScaffold(
             NavigationBar {
                 mainTabs.forEachIndexed { index, screen ->
                     val (icon, label) = when (screen) {
-                        Screen.TIMETABLE -> Icons.Default.CalendarToday to "Timetable".tr
-                        Screen.DASHBOARD -> Icons.Default.Dashboard to "Dashboard".tr
-                        Screen.TASKS -> Icons.Default.CheckCircle to "Tasks".tr
-                        Screen.COURSES -> Icons.Default.School to "Courses".tr
-                        Screen.MORE -> Icons.Default.Widgets to "Tools".tr
+                        Screen.TIMETABLE -> Icons.Default.CalendarToday to timetableLabel
+                        Screen.DASHBOARD -> Icons.Default.Dashboard to dashboardLabel
+                        Screen.TASKS -> Icons.Default.CheckCircle to tasksLabel
+                        Screen.COURSES -> Icons.Default.School to coursesLabel
+                        Screen.MORE -> Icons.Default.Widgets to toolsLabel
                         else -> Icons.Default.Menu to ""
                     }
                     NavigationBarItem(
@@ -144,15 +155,23 @@ fun MainAppScaffold(
                         modifier = Modifier.fillMaxSize()
                     ) { page ->
                         when (mainTabs[page]) {
-                            Screen.TIMETABLE -> TimetableScreen(
+                            Screen.TIMETABLE -> ChaoxingScheduleScreen(
                                 viewModel = scheduleViewModel,
-                                onNavigateToImport = { activeSecondaryScreen = Screen.IMPORT },
-                                onNavigateToCourses = {
+                                onNavigateToDashboard = {
                                     coroutineScope.launch {
-                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.COURSES))
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.DASHBOARD))
                                     }
                                 },
-                                onOpenAcademicCalendar = { showAcademicCalendarModal = true }
+                                onNavigateToTasks = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.TASKS))
+                                    }
+                                },
+                                onNavigateToSettings = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(mainTabs.indexOf(Screen.MORE))
+                                    }
+                                }
                             )
                             Screen.DASHBOARD -> DashboardScreen(
                                 viewModel = scheduleViewModel,

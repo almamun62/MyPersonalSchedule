@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +35,8 @@ import java.util.Locale
 
 enum class TaskTab {
     TASKS,
-    EXAMS
+    EXAMS,
+    REMINDERS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,10 +44,12 @@ enum class TaskTab {
 fun TasksExamsScreen(viewModel: ScheduleViewModel) {
     val allTasks by viewModel.allTasks.collectAsStateWithLifecycle()
     val allExams by viewModel.allExams.collectAsStateWithLifecycle()
+    val allReminders by viewModel.allReminders.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableStateOf(TaskTab.TASKS) }
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var showAddExamDialog by remember { mutableStateOf(false) }
+    var showAddReminderDialog by remember { mutableStateOf(false) }
 
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskCourse by remember { mutableStateOf("") }
@@ -79,15 +83,22 @@ fun TasksExamsScreen(viewModel: ScheduleViewModel) {
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    if (selectedTab == TaskTab.TASKS) showAddTaskDialog = true
-                    else showAddExamDialog = true
+                    when (selectedTab) {
+                        TaskTab.TASKS -> showAddTaskDialog = true
+                        TaskTab.EXAMS -> showAddExamDialog = true
+                        TaskTab.REMINDERS -> showAddReminderDialog = true
+                    }
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 text = {
                     Text(
-                        if (selectedTab == TaskTab.TASKS) "Add Task".tr else "Add Exam".tr,
+                        when (selectedTab) {
+                            TaskTab.TASKS -> "Add Task".tr
+                            TaskTab.EXAMS -> "Add Exam".tr
+                            TaskTab.REMINDERS -> "Add Alarm".tr
+                        },
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -111,12 +122,17 @@ fun TasksExamsScreen(viewModel: ScheduleViewModel) {
                 Tab(
                     selected = selectedTab == TaskTab.TASKS,
                     onClick = { selectedTab = TaskTab.TASKS },
-                    text = { Text("Tasks & Homework (${allTasks.count { !it.isCompleted }})", fontWeight = FontWeight.Bold) }
+                    text = { Text("Tasks (${allTasks.count { !it.isCompleted }})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 )
                 Tab(
                     selected = selectedTab == TaskTab.EXAMS,
                     onClick = { selectedTab = TaskTab.EXAMS },
-                    text = { Text("Exams & Countdown (${allExams.size})", fontWeight = FontWeight.Bold) }
+                    text = { Text("Exams (${allExams.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                )
+                Tab(
+                    selected = selectedTab == TaskTab.REMINDERS,
+                    onClick = { selectedTab = TaskTab.REMINDERS },
+                    text = { Text("Alarms (${allReminders.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 )
             }
 
@@ -506,6 +522,180 @@ fun TasksExamsScreen(viewModel: ScheduleViewModel) {
                     }
                 }
             }
+
+            if (selectedTab == TaskTab.REMINDERS) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Alarm,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Exact Alarms & Scheduled Alerts",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                "Triggers exact alarms with notifications even when phone is locked or screen is off.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+
+                if (allReminders.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.NotificationsActive,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text(
+                                "No active alarms or custom reminders",
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                "Tap + Add Alarm below to set an alert for assignments or study sessions.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(allReminders, key = { it.id }) { reminder ->
+                            val triggerDate = SimpleDateFormat("EEE, MMM d • HH:mm", Locale.getDefault())
+                                .format(Date(reminder.triggerTimeMillis))
+                            val isPast = reminder.triggerTimeMillis < System.currentTimeMillis()
+
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (reminder.isEnabled && !isPast)
+                                        MaterialTheme.colorScheme.surface
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (reminder.isEnabled && !isPast) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (reminder.isEnabled && !isPast) MaterialTheme.colorScheme.primaryContainer
+                                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            if (isPast) Icons.Outlined.AlarmOff else Icons.Outlined.Alarm,
+                                            contentDescription = null,
+                                            tint = if (reminder.isEnabled && !isPast) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            reminder.title,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = if (reminder.isEnabled && !isPast) MaterialTheme.colorScheme.onSurface
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (reminder.description.isNotBlank()) {
+                                            Text(
+                                                reminder.description,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "⏰ $triggerDate",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isPast) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
+                                            )
+                                            if (reminder.repeatInterval != "NONE") {
+                                                Text(
+                                                    "🔄 ${reminder.repeatInterval}",
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.secondary
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Switch(
+                                        checked = reminder.isEnabled,
+                                        onCheckedChange = { viewModel.toggleReminder(reminder) },
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
+
+                                    IconButton(onClick = { viewModel.deleteReminder(reminder) }) {
+                                        Icon(
+                                            Icons.Outlined.Delete,
+                                            contentDescription = "Delete",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -634,6 +824,108 @@ fun TasksExamsScreen(viewModel: ScheduleViewModel) {
             dismissButton = {
                 TextButton(onClick = { showAddExamDialog = false }) {
                     Text("Cancel".tr)
+                }
+            }
+        )
+    }
+
+    if (showAddReminderDialog) {
+        var reminderTitle by remember { mutableStateOf("") }
+        var reminderDesc by remember { mutableStateOf("") }
+        var reminderOffsetDays by remember { mutableIntStateOf(0) }
+        var reminderHour by remember { mutableIntStateOf(9) }
+        var reminderMin by remember { mutableIntStateOf(0) }
+        var reminderRepeat by remember { mutableStateOf("NONE") }
+
+        AlertDialog(
+            onDismissRequest = { showAddReminderDialog = false },
+            title = { Text("Add Scheduled Alarm / Reminder", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = reminderTitle,
+                        onValueChange = { reminderTitle = it },
+                        label = { Text("Reminder Title") },
+                        placeholder = { Text("e.g. Submit CS201 Lab Report") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = reminderDesc,
+                        onValueChange = { reminderDesc = it },
+                        label = { Text("Notes / Classroom (Optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("When to alert:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(0 to "Today", 1 to "Tomorrow", 2 to "+2 Days", 7 to "+1 Week").forEach { (offset, label) ->
+                            FilterChip(
+                                selected = reminderOffsetDays == offset,
+                                onClick = { reminderOffsetDays = offset },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Text("Alarm Time:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(8 to 0, 9 to 0, 12 to 0, 14 to 30, 18 to 0, 21 to 0).forEach { (h, m) ->
+                            val timeStr = String.format("%02d:%02d", h, m)
+                            FilterChip(
+                                selected = reminderHour == h && reminderMin == m,
+                                onClick = {
+                                    reminderHour = h
+                                    reminderMin = m
+                                },
+                                label = { Text(timeStr, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Text("Repeat Interval:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("NONE" to "Once", "DAILY" to "Daily", "WEEKLY" to "Weekly").forEach { (rep, label) ->
+                            FilterChip(
+                                selected = reminderRepeat == rep,
+                                onClick = { reminderRepeat = rep },
+                                label = { Text(label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (reminderTitle.isNotBlank()) {
+                            val cal = java.util.Calendar.getInstance().apply {
+                                add(java.util.Calendar.DAY_OF_YEAR, reminderOffsetDays)
+                                set(java.util.Calendar.HOUR_OF_DAY, reminderHour)
+                                set(java.util.Calendar.MINUTE, reminderMin)
+                                set(java.util.Calendar.SECOND, 0)
+                                set(java.util.Calendar.MILLISECOND, 0)
+                                if (reminderOffsetDays == 0 && timeInMillis <= System.currentTimeMillis()) {
+                                    add(java.util.Calendar.DAY_OF_YEAR, 1)
+                                }
+                            }
+                            viewModel.insertReminder(
+                                title = reminderTitle.trim(),
+                                description = reminderDesc.trim(),
+                                triggerTimeMillis = cal.timeInMillis,
+                                repeatInterval = reminderRepeat
+                            )
+                            showAddReminderDialog = false
+                        }
+                    }
+                ) {
+                    Text("Save Alarm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddReminderDialog = false }) {
+                    Text("Cancel")
                 }
             }
         )

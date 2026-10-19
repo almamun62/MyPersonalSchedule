@@ -468,11 +468,13 @@ fun TimetableScreen(
                                                             )
                                                         }
                                                     } else if (courseInSlot != null) {
+                                                        val bgCol = com.example.ui.theme.parseColorSafe(courseInSlot.colorHex)
+                                                        val textCol = com.example.ui.theme.getContrastingTextColor(bgCol)
                                                         Text(
                                                             text = courseInSlot.name,
                                                             fontSize = if (isTablet) 11.sp else 9.sp,
                                                             fontWeight = FontWeight.Bold,
-                                                            color = Color.White,
+                                                            color = textCol,
                                                             maxLines = 2,
                                                             overflow = TextOverflow.Ellipsis,
                                                             textAlign = TextAlign.Center,
@@ -647,12 +649,9 @@ fun TimetableScreen(
                                                 val cardColor = if (isConflictSlot) {
                                                     Color(0xFFDC2626) // warning red for overlapping classes
                                                 } else {
-                                                    try {
-                                                        Color(android.graphics.Color.parseColor(course.colorHex))
-                                                    } catch (e: Exception) {
-                                                        MaterialTheme.colorScheme.primary
-                                                    }
+                                                    com.example.ui.theme.parseColorSafe(course.colorHex)
                                                 }
+                                                val cardTextColor = if (isConflictSlot) Color.White else com.example.ui.theme.getContrastingTextColor(cardColor)
 
                                                 Card(
                                                     shape = RoundedCornerShape(14.dp),
@@ -688,7 +687,7 @@ fun TimetableScreen(
                                                                 Text(
                                                                     text = course.name,
                                                                     fontWeight = FontWeight.Bold,
-                                                                    color = Color.White,
+                                                                    color = cardTextColor,
                                                                     fontSize = 14.sp,
                                                                     maxLines = 2,
                                                                     overflow = TextOverflow.Ellipsis,
@@ -713,7 +712,7 @@ fun TimetableScreen(
                                                             if (course.classroom.isNotBlank()) {
                                                                 Text(
                                                                     text = "📍 ${course.classroom}",
-                                                                    color = Color.White.copy(alpha = 0.9f),
+                                                                    color = cardTextColor.copy(alpha = 0.9f),
                                                                     fontSize = 11.sp
                                                                 )
                                                             }
@@ -726,7 +725,7 @@ fun TimetableScreen(
                                                         ) {
                                                             Text(
                                                                 text = "${course.startTime} - ${course.endTime}",
-                                                                color = Color.White.copy(alpha = 0.8f),
+                                                                color = cardTextColor.copy(alpha = 0.8f),
                                                                 fontSize = 10.sp
                                                             )
                                                             if (isConflictSlot) {

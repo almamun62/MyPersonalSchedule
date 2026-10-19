@@ -459,8 +459,11 @@ fun NoteTakingCanvasDialog(
                                                         if (isEraserMode) {
                                                             eraseStrokesNear(point.x, point.y)
                                                         } else {
-                                                            currentPath?.lineTo(point.x, point.y)
-                                                            currentPoints.add(Pair(point.x, point.y))
+                                                            val lastPt = currentPoints.lastOrNull()
+                                                            if (lastPt == null || hypot(point.x - lastPt.first, point.y - lastPt.second) >= 2.5f) {
+                                                                currentPath?.lineTo(point.x, point.y)
+                                                                currentPoints.add(Pair(point.x, point.y))
+                                                            }
                                                         }
                                                         change.consume()
                                                     },

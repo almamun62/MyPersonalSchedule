@@ -344,6 +344,56 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             repository.deleteCourseMaterial(material)
         }
     }
+
+    fun insertReminder(
+        title: String,
+        description: String = "",
+        triggerTimeMillis: Long,
+        repeatInterval: String = "NONE",
+        relatedType: String = "GENERAL",
+        relatedId: Long = 0L
+    ) {
+        viewModelScope.launch {
+            repository.insertReminder(
+                com.example.data.model.ReminderEntity(
+                    title = title,
+                    description = description,
+                    triggerTimeMillis = triggerTimeMillis,
+                    repeatInterval = repeatInterval,
+                    relatedType = relatedType,
+                    relatedId = relatedId,
+                    isEnabled = true
+                )
+            )
+            com.example.service.ClassReminderScheduler.rescheduleAllAlarms(getApplication<Application>())
+        }
+    }
+
+    fun deleteReminder(reminder: com.example.data.model.ReminderEntity) {
+        viewModelScope.launch {
+            repository.deleteReminder(reminder)
+            com.example.service.ClassReminderScheduler.rescheduleAllAlarms(getApplication<Application>())
+        }
+    }
+
+    fun toggleReminder(reminder: com.example.data.model.ReminderEntity) {
+        viewModelScope.launch {
+            repository.updateReminder(reminder.copy(isEnabled = !reminder.isEnabled))
+            com.example.service.ClassReminderScheduler.rescheduleAllAlarms(getApplication<Application>())
+        }
+    }
+
+    suspend fun createBackupJson(): String {
+        return com.example.domain.backup.OfflineBackupManager.createBackupJson(database)
+    }
+
+    suspend fun restoreBackupJson(jsonString: String, replaceExisting: Boolean): Result<com.example.domain.backup.BackupRestoreSummary> {
+        val result = com.example.domain.backup.OfflineBackupManager.restoreBackupJson(jsonString, database, replaceExisting)
+        if (result.isSuccess) {
+            rescheduleDndAlarms()
+        }
+        return result
+    }
 }
 
 enum class ScheduleViewMode {

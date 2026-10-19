@@ -27,6 +27,22 @@ class UserPreferencesManager(context: Context) {
     private val _isClassReminder15mEnabled = MutableStateFlow(prefs.getBoolean(KEY_CLASS_REMINDER_15M, true))
     val isClassReminder15mEnabled: StateFlow<Boolean> = _isClassReminder15mEnabled.asStateFlow()
 
+    private val _isPinyinEnabled = MutableStateFlow(prefs.getBoolean(KEY_SHOW_PINYIN, true))
+    val isPinyinEnabled: StateFlow<Boolean> = _isPinyinEnabled.asStateFlow()
+
+    fun setPinyinEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_PINYIN, enabled).apply()
+        _isPinyinEnabled.value = enabled
+    }
+
+    private val _defaultStartupScreen = MutableStateFlow(prefs.getString(KEY_DEFAULT_STARTUP_SCREEN, "TIMETABLE") ?: "TIMETABLE")
+    val defaultStartupScreen: StateFlow<String> = _defaultStartupScreen.asStateFlow()
+
+    fun setDefaultStartupScreen(screen: String) {
+        prefs.edit().putString(KEY_DEFAULT_STARTUP_SCREEN, screen).apply()
+        _defaultStartupScreen.value = screen
+    }
+
     private val _lastUsedRoom = MutableStateFlow(prefs.getString(KEY_LAST_USED_ROOM, "Room 101") ?: "Room 101")
     val lastUsedRoom: StateFlow<String> = _lastUsedRoom.asStateFlow()
 
@@ -233,20 +249,22 @@ class UserPreferencesManager(context: Context) {
         private const val KEY_FOCUS_END_TIMESTAMP = "pref_focus_end_timestamp"
         private const val KEY_FOCUS_TOTAL_MINUTES = "pref_focus_total_minutes"
         private const val KEY_FOCUS_COURSE_NAME = "pref_focus_course_name"
+        private const val KEY_SHOW_PINYIN = "pref_show_pinyin"
+        private const val KEY_DEFAULT_STARTUP_SCREEN = "pref_default_startup_screen"
 
         val defaultSectionTimings = listOf(
-            SectionTiming(1, "08:00", "08:45"),
-            SectionTiming(2, "08:50", "09:35"),
-            SectionTiming(3, "09:50", "10:35"),
-            SectionTiming(4, "10:40", "11:25"),
-            SectionTiming(5, "11:30", "12:15"),
-            SectionTiming(6, "14:30", "15:15"), // Section 6 after lunch break
-            SectionTiming(7, "15:20", "16:05"),
-            SectionTiming(8, "16:20", "17:05"),
-            SectionTiming(9, "17:10", "17:55"),
-            SectionTiming(10, "19:00", "19:45"),
-            SectionTiming(11, "19:50", "20:35"),
-            SectionTiming(12, "20:40", "21:25")
+            SectionTiming(1, "08:00", "08:50"),
+            SectionTiming(2, "09:00", "09:50"),
+            SectionTiming(3, "10:10", "11:00"),
+            SectionTiming(4, "11:10", "12:00"),
+            SectionTiming(5, "14:00", "14:50"),
+            SectionTiming(6, "15:00", "15:50"),
+            SectionTiming(7, "16:10", "17:00"),
+            SectionTiming(8, "17:10", "18:00"),
+            SectionTiming(9, "19:00", "19:50"),
+            SectionTiming(10, "20:00", "20:50"),
+            SectionTiming(11, "21:00", "21:50"),
+            SectionTiming(12, "22:00", "22:50")
         )
 
         @Volatile
